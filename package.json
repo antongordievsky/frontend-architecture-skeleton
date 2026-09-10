@@ -12,9 +12,9 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "typecheck": "tsc -b",
-    "check": "biome ci && bun run typecheck && vite build --outDir node_modules/.cache/check-build && bun audit",
+    "check": "biome ci && oxlint --deny-warnings && bun run typecheck && vite build --outDir node_modules/.cache/check-build && bun audit",
     "format": "biome format --write",
-    "lint": "oxlint",
+    "lint": "oxlint --deny-warnings",
     "preview": "vite preview",
     "graph:build": "codegraph build --no-incremental",
     "graph:update": "codegraph build"
