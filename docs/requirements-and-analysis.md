@@ -116,7 +116,9 @@ Every requirement sits in one tier:
 
 | ID | Requirement | Why | Acceptance criteria |
 |---|---|---|---|
-| QR-11 | **Security baseline, closed by tools wherever a tool exists** | financial data; secrets leak through repositories, bundles, logs and agent context; a control nobody runs is not a control | each control below is enforced by a tool chosen in D-21, and the few that no tool can enforce are named as such in `ARCHITECTURE.md`: secrets never committed (secret scanner in the pre-commit hook and `check`); `.env*` ignored, only `.env.example`; `VITE_*` treated as public; the agent cannot read `.env*` or credential files and they are excluded from the code index (agent settings); `dangerouslySetInnerHTML` and token storage (`localStorage`/`sessionStorage` outside one allowed module) are lint errors; untrusted data renders as text; dependency audit in `check`; frozen lockfile install; a CSP wherever the app is served in production mode (D-12), asserted by a test |
+| QR-11 | **Security baseline, closed by tools wherever a tool exists** | financial data; secrets leak through repositories, bundles, logs and agent context; a control nobody runs is not a control | each control below is enforced by a tool chosen in D-21, and the few that no tool can enforce are named as such in `ARCHITECTURE.md`: secrets never committed (secret scanner in the pre-commit hook and `check`); `.env*` ignored, only `.env.example`; `VITE_*` treated as public; the agent cannot read `.env*` or credential files and they are excluded from the code index (agent settings); `dangerouslySetInnerHTML` and token storage (`localStorage`/`sessionStorage` outside one allowed module) are lint errors; untrusted data renders as text; dependency controls per QR-24; a CSP wherever the app is served in production mode (D-12), asserted by a test |
+| QR-24 | **Dependency supply chain, closed by tools.** A package enters only deliberately, runs no code at install unless trusted, and arrives only after a quarantine | packages are an attack surface: hijacked maintainer accounts publish malicious patch versions, install scripts steal tokens and spread, and AI assistants invent package names that attackers then register ("slopsquatting") — the agent working in this repository is one more way in | a new package needs the author's explicit approval (agent settings: package commands always ask) and a written reason (QR-8); before proposing one, the agent verifies it in the registry — exact name, age, maintainers, repository, provenance; install scripts are blocked except an explicit trust list; versions younger than a quarantine period are not installed; a vulnerability audit runs in `check`; installs are frozen and every lockfile change is visible in the diff; tools and numbers are decided in D-23 |
+| QR-25 | **Dependencies kept fresh on purpose.** Frozen installs stop silent drift, so updating becomes a deliberate, regular job | a lockfile nobody updates ages into known vulnerabilities — staleness is a security risk too | updates run on a cadence, in batches, each batch through `check`; majors one at a time with the changelog read; a security fix may bypass the quarantine after a manual review; the update recipe is one documented command; an update bot is part of DR-9 |
 
 ### 5.6 User experience
 
@@ -160,7 +162,8 @@ would cost.
 | DR-6 | **Security with AI agents** — development time (agent permissions, secret isolation, vetting external skills and MCP servers) and product time (LLM features read untrusted imported data → prompt injection; least-privilege tools; no financial data to third-party models without consent) | a section in `ARCHITECTURE.md` § Next with the threat list and the first controls |
 | DR-7 | **Monitoring destination and product analytics** — Sentry (S2) behind the QR-10 seam; a typed catalogue of product events | swapping the reporter destination is one file; events are a union type, not strings |
 | DR-8 | **Mobile (React Native planned, S2)** — domain types and the contract client usable outside the web | the domain and API layers import no DOM and no React — lint-enforced |
-| DR-9 | **CI/CD with agentic checks.** Deferred for the take-home (no PR flow; `check` and wrap-up reviews run locally). When it arrives: `check` per push; secret scan, dependency audit, e2e and perf jobs; agent reviewers (code, security) as PR gates with the same rubric used locally; a dependency update bot | `ARCHITECTURE.md` § Next lists the jobs, which local command each mirrors, and the agentic gates |
+| DR-9 | **CI/CD with agentic checks.** Deferred for the take-home (no PR flow; `check` and wrap-up reviews run locally). When it arrives: `check` per push; secret scan, dependency audit, e2e and perf jobs; agent reviewers (code, security) as PR gates with the same rubric used locally; a dependency update bot with the QR-24 quarantine, grouped updates, and auto-merge of patch updates only when `check` is green | `ARCHITECTURE.md` § Next lists the jobs, which local command each mirrors, and the agentic gates |
+| DR-10 | **AI tooling for the project's developers.** Skills and generators that produce new pages, API resources, primitives and tests to this repository's standards, so the standards are applied by construction rather than remembered. Not built now: the standards have to settle first, and building it here would be the over-engineering QR-8 and QR-18 warn against | `ARCHITECTURE.md` § Next names the first candidates — one generator per QR-17 recipe — and how their output is held to the same lint rules and gates as hand-written code |
 
 ## 7. Traceability to the evaluation criteria (S1)
 
@@ -306,6 +309,7 @@ Options are genuinely different approaches, and the company's own stack is alway
 | D-13 | React Compiler | QR-4, QR-21 | plan 01 |
 | D-10 | Lint, format, hooks, commit conventions | FR-2, QR-7, QR-14, QR-15 | plan 02 |
 | D-21 | Security tooling and agent guardrails | QR-11, DR-6 | plan 02 |
+| D-23 | How do new packages get into the project, and how do we keep them up to date? | QR-24, QR-25, QR-11 | plan 02 |
 | D-16 | Actor zones and rendering strategy per zone | DR-1, DR-4, QR-8 | plan 03 |
 | D-03 | API contract and typing pipeline; runtime validation at the boundary | FR-3, QR-1, QR-5 | plan 04 |
 | D-08 | Representation of amounts and assets | QR-1, QR-2 | plan 04 |
@@ -320,7 +324,7 @@ Options are genuinely different approaches, and the company's own stack is alway
 | D-19 | Observability and metrics | QR-10, DR-7 | plan 08 |
 | D-20 | Performance strategy and budgets | QR-9, QR-6 | plan 08 |
 | D-11 | CI/CD with agentic checks (design for) | DR-9, QR-15 | plan 09 |
-| D-15 | Extent of the AI layer (commands, agents, MCP beyond the baseline) | QR-18, QR-19, QR-8 | plan 09 |
+| D-15 | Extent of the AI layer (commands, agents, MCP beyond the baseline; the path to DR-10) | QR-18, QR-19, QR-8, DR-10 | plan 09 |
 
 ## Decisions
 
