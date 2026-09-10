@@ -12,7 +12,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "typecheck": "tsc -b",
-    "check": "bun run typecheck && vite build",
+    "check": "bun run typecheck && vite build --outDir node_modules/.cache/check-build",
     "lint": "oxlint",
     "preview": "vite preview",
     "graph:build": "codegraph build --no-incremental",
