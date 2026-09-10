@@ -1,5 +1,5 @@
 # D-12: the production form. Static bundle, client-route fallback, compression, long cache for
-# hashed assets. The Content-Security-Policy arrives with D-21 (plan 02), together with its test.
+# hashed assets, security headers (D-21). scripts/check-headers.sh asserts all of it; pre-push runs it.
 {
 	admin off
 }
@@ -18,7 +18,10 @@
 	@entry not path /assets/*
 	header @entry Cache-Control "no-cache"
 
+	# D-21: scripts, styles and requests only from this origin; the built index.html has nothing inline.
+	# Widening it (fonts, Sentry) names the source here and in scripts/check-headers.sh together.
 	header {
+		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"
 		X-Content-Type-Options nosniff
 		Referrer-Policy strict-origin-when-cross-origin
 		-Server
