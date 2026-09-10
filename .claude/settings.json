@@ -20,6 +20,7 @@
       "Bash(mise exec -- bun run typecheck)",
       "Bash(mise exec -- bun run build)",
       "Bash(mise exec -- bun run lint)",
+      "Bash(mise exec -- bun run format)",
       "Bash(mise exec -- bun run graph:build)",
       "Bash(mise exec -- bun run graph:update)",
       "Bash(mise exec -- bun install --frozen-lockfile)",
@@ -27,9 +28,11 @@
       "Bash(bun run typecheck)",
       "Bash(bun run build)",
       "Bash(bun run lint)",
+      "Bash(bun run format)",
       "Bash(bun run graph:build)",
       "Bash(bun run graph:update)",
       "Bash(bun install --frozen-lockfile)",
+      "Bash(sh scripts/check-headers.sh*)",
       "Bash(docker compose build*)",
       "Bash(docker compose up*)",
       "Bash(docker compose --profile prod up*)",
@@ -122,5 +125,30 @@
       "mcp__playwright__browser_run_code_unsafe",
       "mcp__playwright__browser_file_upload"
     ]
+  },
+  "sandbox": {
+    "enabled": true,
+    "autoAllowBashIfSandboxed": false,
+    "excludedCommands": ["docker"],
+    "filesystem": {
+      "denyRead": ["~/.ssh", "~/.aws", "./.env", "./.env.*"],
+      "allowWrite": [
+        "~/.bun",
+        "~/.cache",
+        "~/.local/share/mise",
+        "~/.local/state/mise",
+        "~/.docker"
+      ]
+    },
+    "network": {
+      "allowedDomains": [
+        "registry.npmjs.org",
+        "github.com",
+        "*.github.com",
+        "*.githubusercontent.com",
+        "ghcr.io",
+        "localhost"
+      ]
+    }
   }
 }
