@@ -1,7 +1,11 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
   "plugins": ["react", "jsx-a11y", "typescript", "oxc"],
+  "jsPlugins": ["./lint/layers.js"],
+  "ignorePatterns": ["lint/fixtures/**"],
   "rules": {
+    "layers/boundaries": ["error", { "zones": ["app"] }],
+
     "typescript/no-explicit-any": "error",
     "typescript/no-non-null-assertion": "error",
     "typescript/consistent-type-definitions": ["error", "type"],
@@ -91,5 +95,74 @@
         "message": "The browser never holds an auth token (DR-2, D-21)."
       }
     ]
-  }
+  },
+  "overrides": [
+    {
+      "files": ["src/domain/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "paths": [
+              {
+                "name": "react",
+                "message": "domain stays free of React and the DOM (DR-8, D-16)."
+              },
+              {
+                "name": "react-dom",
+                "message": "domain stays free of React and the DOM (DR-8, D-16)."
+              }
+            ],
+            "patterns": [
+              {
+                "group": ["react/*", "react-dom/*"],
+                "message": "domain stays free of React and the DOM (DR-8, D-16)."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["src/api/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "paths": [
+              {
+                "name": "react-dom",
+                "message": "api stays usable by React Native: no DOM (DR-8, CC-04)."
+              }
+            ],
+            "patterns": [
+              {
+                "group": ["react-dom/*"],
+                "message": "api stays usable by React Native: no DOM (DR-8, CC-04)."
+              }
+            ]
+          }
+        ],
+        "no-restricted-globals": [
+          "error",
+          {
+            "name": "window",
+            "message": "api stays usable by React Native: no DOM (DR-8, CC-04)."
+          },
+          {
+            "name": "document",
+            "message": "api stays usable by React Native: no DOM (DR-8, CC-04)."
+          },
+          {
+            "name": "localStorage",
+            "message": "The browser never holds an auth token (DR-2, D-21)."
+          },
+          {
+            "name": "sessionStorage",
+            "message": "The browser never holds an auth token (DR-2, D-21)."
+          }
+        ]
+      }
+    }
+  ]
 }
