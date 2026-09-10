@@ -303,7 +303,7 @@ Options are genuinely different approaches, and the company's own stack is alway
 | ID | Open question | Judged by | Needed by |
 |---|---|---|---|
 | D-01 | Build the web app as one project, or split it up front into shareable parts? | QR-8, QR-5, DR-1, DR-8, C-2 | plan 01 |
-| D-02 | Package manager and runtime | QR-13, QR-21, C-2 | plan 01 |
+| D-02 | How do we install the project's building blocks, and which engine runs our tools? | QR-13, QR-11, QR-21, QR-19, FR-6, C-2 | plan 01 |
 | D-12 | What `docker compose up` serves (dev server vs production build); `check` in Docker | C-2, FR-6, QR-11, QR-13 | plan 01 |
 | D-22 | TypeScript configuration and conventions (flags, `type` vs `interface`, enums, casts) | QR-1, QR-3 | plan 01 |
 | D-13 | React Compiler | QR-4, QR-21 | plan 01 |
@@ -363,6 +363,41 @@ It comes first because every later decision builds on the shape of the project.
   - *Gains* — one install, one config, one image, one `check`; a new hire sees one tree; an interviewer extends it without first learning a package map.
   - *Costs* — boundaries rest on lint and tsconfig, not on package manifests; every new top-level folder must be added to the rules, or it is silently unconstrained (a gate that checks the gate is a candidate for plan 03).
   - *Growth path* — the second consumer triggers extraction into packages. React Native would then reuse the domain, the contract and the API client; UI, routing and the credentials part of the transport stay per platform.
+
+### D-02 — How do we install the project's building blocks, and which engine runs our tools?
+
+`Accepted` 2026-09-10 · needed by plan 01 · build now · judged by QR-13, QR-11, QR-24, QR-21, QR-19, FR-6, C-2
+
+**What we are deciding.** Every developer, every check and the Docker setup must install the project's
+third-party building blocks the same way, with one tool, and run the development tools on one engine.
+The company's team uses a newer, faster toolkit for this; the testing tools officially promise support only
+for the established engine. Choosing the team's toolkit makes the skeleton feel native to them;
+choosing the established engine avoids spending a short time budget on compatibility surprises. The
+choice also sets how far the project trusts third-party code that wants to run during installation — a
+supply-chain risk.
+
+**Not decided here:** what `docker compose up` serves (D-12), the hook manager (D-10), the TypeScript
+version and flags (D-22).
+
+| Criterion | A — npm, Node 24 LTS | B — pnpm, Node 24 LTS | C — Bun installs and runs scripts, Node 24 LTS runs the tools | D — Bun for everything |
+|---|---|---|---|---|
+| QR-21 the company's stack | ❌ not theirs | ❌ not theirs | ✅ Bun for install and scripts · ⚠️ tools on Node | ✅ fully theirs |
+| QR-13 one lockfile, frozen install | ✅ `npm ci` | ⚠️ frozen install fails until `allowBuilds` is set; settings renamed between majors | ✅ `bun install --frozen-lockfile`, text `bun.lock` | ✅ as C |
+| QR-11 install scripts (supply chain) | ❌ runs every package's scripts | ✅ blocks all until allowed, and fails loudly | ✅ blocks all but a 367-package default trust list | ✅ as C |
+| QR-24 quarantine, audit, provenance | ✅ `--min-release-age`, `npm audit`, `npm audit signatures` (76 packages attested in the spike) | ⚠️ `minimumReleaseAge`, `pnpm audit` (not measured) | ⚠️ `install.minimumReleaseAge`, `bun audit` (310 packages, 288 ms); signature verification ❓ | ⚠️ as C |
+| FR-6 test tools on a documented runtime | ✅ | ✅ | ✅ | ⚠️ Vitest passed on `--bun`; Playwright does not list Bun |
+| QR-19 CodeGraph and MCP on the host | ✅ | ✅ | ✅ | ⚠️ still needs Node on the host — "Bun everywhere" is not reachable |
+| C-2 Docker image | ✅ official Node image | ⚠️ Node image plus pinned pnpm | ⚠️ Node image plus the Bun binary: builds in 9 s, 464 MB | ⚠️ 274 MB, but `node` is a symlink to Bun |
+| Cost today | ✅ none | ⚠️ allowlist config | ⚠️ one Dockerfile line; Bun on the author's machine | ⚠️ as C, plus compatibility debugging |
+| Cost of changing later | ✅ regenerate the lockfile | ✅ as A | ✅ as A; C → D drops Node from the image | ✅ as A |
+
+- **Decision:** Bun 1.4.2 installs dependencies and runs scripts, with one `bun.lock`; Node 24 LTS (24.21.0) runs Vite, Vitest, Playwright and CodeGraph; the Docker image is Node with the Bun binary copied in.
+- **Evidence:** spike, 2026-09-10 — CodeGraph 3.17.0 builds its index under all three managers; pnpm 11.5.3 exits 1 (`ERR_PNPM_IGNORED_BUILDS`) until `allowBuilds` is set; Bun trusts lefthook, msw and better-sqlite3 through its default list; in `oven/bun:1.4.2-slim`, `node` is a symlink to Bun. Docs: Vitest requires Node ≥ 22.12; Playwright lists Node 22, 24 and 26 only.
+- **Wrong if:** Playwright adds Bun to its supported runtimes, or parity with the company's own runtime matters more than documented support — then D, by dropping Node from the image. If the two-runtime image costs more time than the budget allows — then A.
+- **Where it leads:**
+  - *Gains* — the skeleton speaks the company's commands; install scripts of unknown packages are blocked by default; the test tools run on the runtime they document.
+  - *Costs* — two runtimes to pin and a larger image; Bun on the author's machine (C-2 is unaffected: the image carries both); `bun test` starts Bun's own test runner, not Vitest, so scripts always go through `bun run test`.
+  - *Growth path* — C → D is one Dockerfile line once Playwright supports Bun; C → A is regenerating the lockfile.
 
 ---
 
