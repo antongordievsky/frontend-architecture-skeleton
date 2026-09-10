@@ -8,7 +8,12 @@
 	root * /srv
 	encode zstd gzip
 
-	@hashed path /assets/*
+	# Only a hashed file that exists is cached for a year. A missing one answers 404: falling back to
+	# index.html would let the browser keep HTML under a script URL, immutable, for a year.
+	@hashed {
+		path /assets/*
+		file
+	}
 	header @hashed Cache-Control "public, max-age=31536000, immutable"
 	@entry not path /assets/*
 	header @entry Cache-Control "no-cache"
@@ -19,6 +24,11 @@
 		-Server
 	}
 
-	try_files {path} /index.html
-	file_server
+	handle /assets/* {
+		file_server
+	}
+	handle {
+		try_files {path} /index.html
+		file_server
+	}
 }
