@@ -770,8 +770,13 @@ entry states honestly where each control stops.
     was the AWS key ID alone, which betterleaks does not flag in any mode.
   - *The built `index.html`* — one module script and one stylesheet, both from `/assets`, and nothing
     inline, so `'self'` holds for both scripts and styles.
-  - *Lint* — oxlint's `react/no-danger` fired. The storage ban caught 4 of 5 accesses:
-    `const { localStorage } = window` slips through.
+  - *Lint* — oxlint's `react/no-danger` fired. The storage ban caught every access the spike made.
+    - *Corrected 2026-09-10 in plan 02:* this entry first said the destructuring
+      `const { localStorage } = window` slips through. It does not — the spike flagged it, and the
+      reading miscounted.
+    - The real gaps, measured then: an alias (`const w = window; w.localStorage`), a computed key
+      (`window['local' + 'Storage']`) and `document.defaultView?.localStorage` pass. `self.localStorage`
+      also passed, and plan 02 closed it.
   - *Sandbox* — the Claude Code settings schema has `sandbox.enabled`, `filesystem.denyRead`,
     `network.allowedDomains`, `credentials.files` and `excludedCommands`. How it behaves is not yet
     measured; plan 02 proves it by reading a planted file in a denied path.
@@ -788,7 +793,7 @@ entry states honestly where each control stops.
     anywhere but our server. The two code patterns that leak tokens or run untrusted HTML fail lint. The
     agent's shell cannot read the author's keys even if an injected prompt asks it to.
   - *Costs* — one Go binary pinned twice (mise and the image); a header test to keep in step with the
-    policy; a known bypass of the storage ban (destructuring), so review still owns it (QR-7); Docker and
+    policy; known bypasses of the storage ban (an alias, a computed key, `document.defaultView`), so review still owns them (QR-7) — the real guard is that no token ever reaches the browser (DR-2); Docker and
     the MCP servers outside the sandbox.
   - *For the domain* — the scanner flags mock exchange connections with key fields. The frontend has no
     use for exchange credentials, so the contract carries a connection's status and never its keys. That

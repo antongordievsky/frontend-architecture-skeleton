@@ -103,7 +103,7 @@ Recorded in the log below, never committed:
 | audit | a scratch copy of the tree with `lodash@4.17.20` → `check` exits 1 |
 | format | an unformatted file → `biome ci` exits 1 |
 | each lint rule | its own violation (the D-10 spike files) → that rule fires; a rule that never fires is removed, not kept |
-| storage ban | `localStorage`, `window.sessionStorage`, `globalThis.localStorage` fail; the destructuring bypass is recorded as a known gap |
+| storage ban | `localStorage`, `window.sessionStorage`, `globalThis.localStorage`, destructuring from `window` fail; the gaps that pass (alias, computed key, `document.defaultView`) are recorded |
 | secrets | a random fake key staged → pre-commit refuses the commit; in the tree → `check` exits 1 |
 | commit-msg | the 7 bad headers from D-25 are refused |
 | Docker gate on dependencies | a `package.json` change that the lockfile does not match → the commit is refused |
