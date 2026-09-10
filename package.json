@@ -14,7 +14,9 @@
     "typecheck": "tsc -b",
     "check": "bun run typecheck && vite build",
     "lint": "oxlint",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "graph:build": "codegraph build --no-incremental",
+    "graph:update": "codegraph build"
   },
   "dependencies": {
     "react": "^19.2.8",
@@ -22,6 +24,8 @@
   },
   "devDependencies": {
     "@babel/core": "8.0.1",
+    "@optave/codegraph": "3.17.0",
+    "@playwright/mcp": "0.0.80",
     "@rolldown/plugin-babel": "0.2.4",
     "@types/node": "^24.13.3",
     "@types/react": "^19.2.18",

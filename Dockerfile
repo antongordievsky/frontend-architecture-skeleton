@@ -7,9 +7,12 @@ COPY --from=bun /usr/local/bin/bun /usr/local/bin/bun
 WORKDIR /app
 
 # Dependencies come from the lockfile only: a package.json that disagrees with bun.lock fails here (QR-13).
+# No third-party install script runs in the image (QR-24): nothing the app builds with needs one, and
+# Bun's built-in trust list would otherwise let better-sqlite3 (pulled in by the host-only CodeGraph)
+# start a native node-gyp build that the slim image cannot complete.
 FROM base AS deps
 COPY package.json bun.lock ./
-RUN bun install --frozen-lockfile
+RUN bun install --frozen-lockfile --ignore-scripts
 
 # Development form: compose bind-mounts the source; node_modules stays in a named volume, never on the host.
 FROM deps AS dev

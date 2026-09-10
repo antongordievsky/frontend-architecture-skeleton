@@ -23,6 +23,9 @@ dist-ssr
 *.sln
 *.sw?
 
+# The code index is derived from the tree and rebuilt on demand (QR-19).
+.codegraph/
+
 # Environment files hold real values and never enter git; only the placeholder template does.
 .env
 .env.*

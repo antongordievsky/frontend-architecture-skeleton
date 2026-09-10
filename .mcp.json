@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "codegraph": {
+      "command": "node_modules/.bin/codegraph",
+      "args": ["mcp", "--db", ".codegraph/graph.db"]
+    },
+    "playwright": {
+      "command": "node_modules/.bin/playwright-mcp",
+      "args": ["--headless", "--isolated"]
+    }
+  }
+}
