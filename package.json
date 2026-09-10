@@ -24,6 +24,7 @@
   },
   "devDependencies": {
     "@babel/core": "8.0.1",
+    "@biomejs/biome": "2.5.12",
     "@optave/codegraph": "3.17.0",
     "@playwright/mcp": "0.0.80",
     "@rolldown/plugin-babel": "0.2.4",
