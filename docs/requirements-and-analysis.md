@@ -164,6 +164,7 @@ would cost.
 | DR-8 | **Mobile (React Native planned, S2)** — domain types and the contract client usable outside the web | the domain and API layers import no DOM and no React — lint-enforced |
 | DR-9 | **CI/CD with agentic checks.** Deferred for the take-home (no PR flow; `check` and wrap-up reviews run locally). When it arrives: `check` per push; secret scan, dependency audit, e2e and perf jobs; agent reviewers (code, security) as PR gates with the same rubric used locally; a dependency update bot with the QR-24 quarantine, grouped updates, and auto-merge of patch updates only when `check` is green | `ARCHITECTURE.md` § Next lists the jobs, which local command each mirrors, and the agentic gates |
 | DR-10 | **AI tooling for the project's developers.** Skills and generators that produce new pages, API resources, primitives and tests to this repository's standards, so the standards are applied by construction rather than remembered. Not built now: the standards have to settle first, and building it here would be the over-engineering QR-8 and QR-18 warn against | `ARCHITECTURE.md` § Next names the first candidates — one generator per QR-17 recipe — and how their output is held to the same lint rules and gates as hand-written code |
+| DR-11 | **Development process and environment parity.** How work moves between local development, the local production mode, CI, staging and production, and how close each is to production — hardware included: a test that passes on a fast laptop can fail on the slow CPUs production and CI often run on (S4). Recorded now, decided together with CI/CD | `ARCHITECTURE.md` § Next lists the environments, what each one proves, and how hardware parity is approximated (throttling, QR-9) |
 
 ## 7. Traceability to the evaluation criteria (S1)
 
@@ -323,7 +324,7 @@ Options are genuinely different approaches, and the company's own stack is alway
 | D-06 | State placement (server, URL, client) and the table's data model | FR-3, FR-7, QR-6 | plan 07 |
 | D-19 | Observability and metrics | QR-10, DR-7 | plan 08 |
 | D-20 | Performance strategy and budgets | QR-9, QR-6 | plan 08 |
-| D-11 | CI/CD with agentic checks (design for) | DR-9, QR-15 | plan 09 |
+| D-11 | CI/CD with agentic checks, and how environments stay close to production (design for) | DR-9, DR-11, QR-15 | plan 09 |
 | D-15 | Extent of the AI layer (commands, agents, MCP beyond the baseline; the path to DR-10) | QR-18, QR-19, QR-8, DR-10 | plan 09 |
 
 ## Decisions
