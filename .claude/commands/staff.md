@@ -68,8 +68,13 @@ Consult only, no code. One decision per run.
 5. **Cost in this repository** — files and commits it adds, and what it does to the 1.5–2 h budget.
 6. **One recommendation** and the condition under which it would be wrong.
 
-Write the result into Part II in the entry format defined there — **at most 12 lines, 5 for a "design
-for" entry** — with `Status: Proposed`. The status becomes `Accepted` only when the author says so.
+Write the result into Part II in the entry format defined there — **a title and a "What we are deciding"
+written in business language a product manager would follow (no tool names — the table carries the
+technical detail), a status line, "Not decided here", a trade-off table (rows:
+the judging requirements plus cost today, cost of changing later and the company's stack; columns: the
+options; cells ✅ ⚠️ ❌ ❓ with a few words), then Decision, Evidence, Wrong if, Where it leads** — marked
+`Proposed`. A "design for" entry may drop the table. It becomes `Accepted` only when the author says so.
+Rename the register row to the same plain-language title.
 
 **Verdict:** `DIRECTION_PROPOSED` | `NEEDS_AUTHOR` (the requirements do not decide it — say which
 question the author must answer)

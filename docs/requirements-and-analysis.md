@@ -267,17 +267,33 @@ starts, `/staff direction` produces the decisions that plan needs, one at a time
 recalled; each becomes `Accepted` only after the author confirms it. An `Accepted` entry is a hard
 constraint; changing it is an amendment written here, agreed first.
 
-**Entry format.** Short on purpose — at most 12 lines, and at most 5 for a "design for" entry.
+**Entry format.** Built for review: the title says what is being chosen, a short context says why it
+matters, the trade-offs are a table a reviewer can scan, and the conclusion is four bullets. A "design
+for" entry may drop the table and keep Decision, Wrong if and Where it leads. Decision and Where it
+leads are written to be lifted into `ARCHITECTURE.md` as they are — that file is assembled from them.
 
+```markdown
+### D-NN — <the choice, as a question a product manager would understand>
+
+`Open | Proposed | Accepted` · needed by plan NN · build now | design for · judged by <IDs>
+
+**What we are deciding.** Three to five sentences in plain, business language — no tool names: what is at
+stake for the product, the tension between the options, and why it is decided at this point.
+
+**Not decided here:** neighbouring questions, and the entries that own them.
+
+| Criterion | A — … | B — … | C — … |
+|---|---|---|---|
+| <each judging requirement, plus cost today, cost of changing later, QR-21 the company's stack> | ✅ / ⚠️ / ❌ / ❓ + a few words | … | … |
+
+- **Decision:** one sentence.
+- **Evidence:** measured facts (version, date, size, spike) with their source.
+- **Wrong if:** the observable condition under which this decision becomes the wrong one.
+- **Where it leads:** gains, costs, and the growth path — concretely, not "has trade-offs".
 ```
-### D-NN — <question>            Status: Open | Proposed | Accepted     Needed by: plan NN
-Judged by: C-, FR-, QR-, DR- IDs            Tier: build now | design for
-Options:   A / B / C — measured facts (version, release date, size, spike) with their source
-Disqualifiers: why each rejected option lost — a specific reason, not a general weakness
-Decision:  one sentence
-Wrong if:  the condition under which this decision becomes the wrong one
-Consequences: what gets easier / what gets more expensive, concretely
-```
+
+Legend: ✅ satisfies · ⚠️ partly, or at a cost · ❌ fails — the requirement named in the row · ❓ unknown.
+Options are genuinely different approaches, and the company's own stack is always one of them when it applies.
 
 ## Register
 
@@ -328,4 +344,4 @@ taken from the bottom and recorded in `ARCHITECTURE.md` § Skipped.
 | 06 | UI foundation: tokens, primitives, a11y defaults |
 | 07 | Transactions page: table over 10 000 rows, four states, tests across the trophy |
 | 08 | Observability seam and performance budgets (stretch) |
-| 09 | `ARCHITECTURE.md`, README, AI-layer paragraph, final review |
+| 09 | `ARCHITECTURE.md` assembled from Part II conclusions (Decision, Where it leads), README, AI-layer paragraph, final review |

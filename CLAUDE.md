@@ -44,7 +44,14 @@ Requirements (Part I) are written once and change only with the author's agreeme
 ## Decisions
 
 - Measure, do not recall: versions, sizes, behaviour come from a command run in this session.
-- Every decision names its options, a disqualifier for each rejected one, and a "wrong if" condition.
+- Every Part II entry has one shape (template in Part II), written for two readers:
+  - for a product manager — a title that is a plain question, and "What we are deciding" in business
+    language with no tool names: what is at stake and the tension between the options;
+  - for a reviewer — a trade-off table (options × the judging requirements, cost today, cost of
+    changing later, the company's stack; cells ✅ ⚠️ ❌ ❓ with a few words);
+  - then the conclusion: Decision, Evidence, Wrong if, Where it leads (gains, costs, growth path).
+- The entries are the single source for `ARCHITECTURE.md`: its sections are assembled from each entry's
+  Decision and Where it leads, not rewritten. If the summary needs different words, fix the entry first.
 - Changing an `Accepted` decision = an amendment written in Part II, agreed first. Never silently.
 
 ## Generators first
