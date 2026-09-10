@@ -305,7 +305,7 @@ Options are genuinely different approaches, and the company's own stack is alway
 |---|---|---|---|
 | D-01 | Build the web app as one project, or split it up front into shareable parts? | QR-8, QR-5, DR-1, DR-8, C-2 | plan 01 |
 | D-02 | How do we install the project's building blocks, and which engine runs our tools? | QR-13, QR-11, QR-21, QR-19, FR-6, C-2 | plan 01 |
-| D-12 | What `docker compose up` serves (dev server vs production build); `check` in Docker | C-2, FR-6, QR-11, QR-13 | plan 01 |
+| D-12 | Which version of the app do we run while developing, and which one do the tests check? | C-2, FR-6, QR-9, QR-11, QR-13, QR-17 | plan 01 |
 | D-22 | TypeScript configuration and conventions (flags, `type` vs `interface`, enums, casts) | QR-1, QR-3 | plan 01 |
 | D-13 | React Compiler | QR-4, QR-21 | plan 01 |
 | D-10 | Lint, format, hooks, commit conventions | FR-2, QR-7, QR-14, QR-15 | plan 02 |
@@ -399,6 +399,52 @@ version and flags (D-22).
   - *Gains* — the skeleton speaks the company's commands; install scripts of unknown packages are blocked by default; the test tools run on the runtime they document.
   - *Costs* — two runtimes to pin and a larger image; Bun on the author's machine (C-2 is unaffected: the image carries both); `bun test` starts Bun's own test runner, not Vitest, so scripts always go through `bun run test`.
   - *Growth path* — C → D is one Dockerfile line once Playwright supports Bun; C → A is regenerating the lockfile.
+
+### D-12 — Which version of the app do we run while developing, and which one do the tests check?
+
+`Accepted` 2026-09-10 · needed by plan 01 · build now · judged by C-2, FR-6, QR-9, QR-11, QR-13, QR-17
+
+**What we are deciding.** The app exists in two forms: the development form, where a code edit appears
+in the browser within a second, and the production form users receive — optimised, with production
+security headers, compression and caching. They behave differently, so a bug can live in one and not
+the other, and a test that passes against the development form proves little about the product. Slow
+production hardware widens the gap further: a test that passes on a fast laptop can fail on the cheap
+CPUs production often runs on (S4). Yet development without instant feedback is slow, and the interview
+extends the code live. The question is which form one command starts, which form the tests check, and
+how close the local production form is to a real one. Whatever the answer, everything runs in Docker —
+the machine needs nothing else (C-2).
+
+**Not decided here:** how the production form gets data without the mock inside the build (D-04 — a mock
+server behind the same origin keeps the build identical to production), browser tests in Docker (D-09),
+throttling numbers (D-20), CI/CD and environment parity beyond this machine (D-11, DR-11).
+
+| Criterion | A — dev only; tests build production on their own | B — production only | C — two modes; production served by `vite preview` | D — two modes; production served by Caddy |
+|---|---|---|---|---|
+| C-2 one command, reachable | ✅ | ✅ | ✅ `docker compose up` is dev | ✅ as C |
+| QR-17 live extension (edit → see) | ✅ hot reload; a host edit reached the container in 18 ms | ❌ rebuild after every change | ✅ | ✅ |
+| Tests check what users get | ⚠️ a production bundle, hidden inside the test tooling | ✅ | ⚠️ production bundle, but preview is "not meant as a production server" — headers, fallback and compression differ | ✅ production bundle behind a real server config |
+| QR-11 CSP asserted in production mode | ⚠️ preview headers only | ✅ | ⚠️ preview headers only | ✅ in the server config, with a test |
+| QR-9 budgets on the production form | ✅ | ✅ | ✅ | ✅ |
+| A failing browser test, reproduced by hand | ⚠️ no production mode to open | ✅ | ✅ `--profile prod` | ✅ `--profile prod` |
+| QR-13 clean-clone boot | ⚠️ `node_modules` in a named volume | ✅ | ⚠️ two paths to keep working | ⚠️ two paths; a broken build fails the production stage early |
+| QR-8 pragmatism | ✅ one mode | ⚠️ server, plus mock data in the build | ✅ the second mode has a consumer: the tests | ✅ as C, plus about ten lines of server config |
+| Cost today | ✅ lowest | ⚠️ server stage | ⚠️ a compose profile | ⚠️ a profile, a build stage, a Caddyfile (`caddy:2-alpine`, 21.7 MB) |
+| Editing on Windows with WSL2 | ⚠️ needs polling | ✅ nothing to watch | ⚠️ dev as A | ⚠️ dev as A |
+| QR-21 the company's stack | ❓ how they host the frontend is unknown | ❓ | ❓ | ❓ |
+
+- **Decision:** two modes, both in Docker — development on the dev server, every browser test against a production build behind a real web server:
+  - `docker compose up` → `web`: the Vite dev server with hot reload, source bind-mounted — the base for development;
+  - `docker compose --profile prod up` → `web-prod`: a multi-stage image builds the production bundle and serves it with Caddy, a single-binary web server in nginx's role — static files, `index.html` fallback for client routes, production headers (CSP, caching, compression), and `/api` proxied to the mock if D-04 needs it;
+  - `docker compose run --rm check` → the full `check` in the dev image;
+  - end-to-end, accessibility and throttled performance tests run against `web-prod`, never against the dev server.
+
+  Caddy over nginx for a shorter config (to be confirmed in plan 01); nginx is equally valid and more familiar — the difference is one config file, not the architecture.
+- **Evidence:** spike, 2026-09-10 — through the OrbStack bind mount a host edit reached `fs.watch` in the container in 18 ms. Vite docs: `vite preview` is "not meant as a production server", only "an easy way to check if the production build looks OK" locally; on Docker with a WSL2 backend, file watching misses edits made by Windows apps. Docker Hub: `caddy:2-alpine` 21.7 MB, `nginx:1.29-alpine` 24.6 MB compressed.
+- **Wrong if:** the real host serves the frontend in a way Caddy cannot approximate — assets from the Rails app, or a CDN with its own headers; then the production mode mirrors that host instead. Or the interview needs no live editing — then B alone.
+- **Where it leads:**
+  - *Gains* — tests exercise the bundle and headers users get; a failing test opens by hand in the same mode; development keeps instant feedback.
+  - *Costs* — two modes to keep working; a production build before each browser-test run; a Caddyfile to own; editing inside Docker on Windows needs polling.
+  - *Growth path* — the production stage becomes the deploy artefact; CI runs the same profile and tests (D-11); staging and hardware parity are DR-11.
 
 ---
 
