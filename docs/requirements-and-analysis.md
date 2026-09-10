@@ -1016,7 +1016,11 @@ code, and the rules must exist before the code does.
     - a hand-written rule on an alpha API. It is guarded by a fixture that must fail in exactly the
       expected places on every `check`;
     - on promotion, the choice between `components/` and `ui/` stays a human judgement, named as such in
-      `ARCHITECTURE.md` (QR-7).
+      `ARCHITECTURE.md` (QR-7);
+    - *added 2026-09-11 at plan 03's review:* lint keeps the DOM out of `api` only by its bare globals
+      (`window`, `document`, `location`, `navigator`, `history`). `globalThis.document`,
+      `self.document` and aliases pass, as with D-21's storage ban; the React Native build is the
+      final check. An `import()` whose path is computed is refused, because it cannot be checked.
   - *Growth path:*
     - `components/` on a second consumer;
     - `public/` and `admin/` with their first page;

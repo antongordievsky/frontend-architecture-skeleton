@@ -22,7 +22,11 @@ Everything runs in Docker (C-2). Host commands use the runtimes pinned in `mise.
 | Refresh the code index | `mise exec -- bun run graph:update` (`graph:build` rebuilds from scratch) |
 
 - `WEB_PORT` and `PROD_PORT` override 5173 and 8080 when they are taken.
-- `check` = format → lint → typecheck → build → secrets → audit; tests join in plan 04.
+- `check` = format → lint → typecheck → build → secrets → audit; tests join in plan 04. `lint` is oxlint,
+  then `lint/layers.test.mjs`, which proves the D-16 boundary rule on its fixture.
+- Boundaries (D-16): the layer map is in `lint/layers.js`; the zones that exist are the rule's option in
+  `.oxlintrc.json`. A new top-level folder in `src/` fails lint until its row is added. A new boundary
+  gets a marked case in `lint/fixtures/layers` in the same commit.
 - Hooks (`.githooks/`, switched on once by `bun install` through `prepare`). Each refuses to run while
   the working tree differs from what it checks; set unrelated changes aside with
   `git stash push --include-untracked -- <paths>`.
@@ -164,5 +168,6 @@ Requirements (Part I) are written once and change only with the author's agreeme
   `docker` runs outside the sandbox, and the agent's `docker compose` commands are pre-approved. A
   container they start runs project code with write access to the tree and an open network. That gap
   is named, not closed: D-26, deferred. A commit that changes dependencies runs the Docker gate, so it is
-  committed outside the sandbox, with the author's approval.
+  committed outside the sandbox, with the author's approval. So is a merge or branch switch that changes
+  `.claude/settings.json`: the sandbox refuses git's write to that file.
 - Everything else in the AI layer is decided in D-15 and exists only with a consumer (QR-18).

@@ -1,6 +1,6 @@
 # Plan 03 — Boundaries: page modules, zones and the layer rule
 
-**Status:** in progress — GREEN LIGHT 2026-09-11 · **Timebox:** 30 min of execution
+**Status:** done 2026-09-11 — GREEN LIGHT 2026-09-11 · **Timebox:** 30 min of execution
 **Serves:** FR-2, DR-1 and DR-8 (their lint part), QR-7, QR-8, QR-23 · **Applies:** D-16, D-10, D-01, D-24
 
 ## Why this plan exists
@@ -107,7 +107,90 @@ once on the real tree, like plan 02's rules, and are not part of the fixture.
 
 ## What happened
 
-*(filled at wrap-up)*
+Executed 2026-09-11 on `build/03-boundaries`. The rule, its fixture and its gate took about 25 minutes
+after GREEN LIGHT, inside the timebox; nothing was cut. The decision took longer than the code: D-16
+went through three shapes before any code was written.
 
 - *Update batch (QR-25):* `bun outdated` at the start of the plan offered nothing. Newer `@babel/core`
   and `@biomejs/biome` exist, but both are still inside the 7-day quarantine.
+
+**Deviations and surprises**
+
+1. *D-16 changed shape twice, both times on the author's input.*
+   - The first proposal was five flat layers with pages as plain folders (spike v1, 12 of 12).
+   - The author pointed to the page modules of careero and we-travel-template: a folder per screen with
+     its own subfolders and an `index.ts`. Spike v2 was rebuilt around that, with zones from careero:
+     14 of 14. Its first run had the right count but two wrong reasons, because a zone's root was taken
+     for a shell file. Since then the reason is checked, not the count.
+   - The author then asked where the generated hooks live. That exposed CC-04: "`api` has no React"
+     contradicted D-24. DR-8, D-01 and D-16 were amended with the author's agreement.
+2. *The risk about rule options did not happen.* `context.options` reaches a JS plugin rule in oxlint
+   1.82.0: the same fixture gave different reports with `zones: ["app"]` and `["app", "admin"]`.
+3. *An override replaces a rule's options; it does not merge them.* Measured on a scratch tree: with an
+   override for `src/api/**`, the top-level `localStorage` ban no longer applied there. So the `api`
+   override repeats plan 02's storage ban, and the proof checks it.
+4. *An unknown folder was noisy.* A file in a folder outside the map was reported once for the folder
+   and again for each of its imports. The rule now reports it once per file.
+5. *oxlint prints two built-in rules differently.* In `--format unix`, `no-restricted-imports` prints
+   its default text ("'react' import is restricted from being used."), not the configured message.
+   `no-restricted-globals` prints the configured message. The config's messages still document the
+   reason.
+6. *`npm view` fails inside the sandbox,* because npm's cache in `~/.npm` is not writable there. The
+   registry was read with `curl` instead.
+7. *The rule's commit ran the Docker gate,* because `package.json` changed. Inside the sandbox it
+   failed on a write to `~/.docker/buildx`, which the sandbox refuses since plan 02. It was then
+   committed outside the sandbox, with the author's approval.
+
+**Gates proven (QR-23)**
+
+| Gate | Deliberate break | Result |
+|---|---|---|
+| the rule, on the fixture | the fixture test as committed | 17 of 17 expected violations reported, nothing else |
+| missed violation | the rule's cross-page check disabled | exit 1: the five cross-page markers unanswered. The rule still fired on those lines with a weaker reason, and the test refused that too |
+| stray marker | a marker above `main.tsx`'s allowed import | exit 1: "expected, not reported" |
+| unexpected report | a `ui` → `api` import with no marker | exit 1: "reported, not expected" |
+| the real tree | `src/utils/x.ts`; React in `src/domain`; `react-dom`, `document` and `localStorage` in `src/api`; React in `src/api` | exactly 5 reports; React in `api` gave none |
+| the fixture out of the main lint | the `ignorePatterns` entry removed | the main lint: 19 problems, exit 1 |
+
+**Measured**
+
+- *Lint:* 0.04 s before the rule and 0.25 s after. Of that, oxlint with the plugin takes 0.09 s and
+  the fixture test the rest.
+- *CodeGraph:* 31 files indexed after the new folder.
+
+**Versions used:** oxlint 1.82.0, Biome 2.5.12, Bun 1.4.2, Node 24.21.0.
+
+**Reviews at wrap-up**
+
+*`/code-review`* reported six issues. It confirmed four of them on a scratch tree built to hit each
+case, and found the other two by reading the config. Five were fixed in `ee446c6` and one is recorded:
+
+| Finding | Outcome |
+|---|---|
+| The src root was the *last* `/src/` in a path. A checkout inside a folder named `src` made every file outside the project's `src/` fail lint | Fixed: the root is anchored to the rule's own location through a `src` option, and paths are compared as real paths. Proven on a copy inside `…/src/proj`: the old rule flagged `vite.config.ts` and `lint/layers.js`, the new rule only the deliberate file |
+| A type written as `import('…')`, `import x = require('…')` and `import()` with a template literal went unseen, so page-to-page types got through | Fixed after measuring their AST shapes on oxlint 1.82.0. A computed `import()` path cannot be checked, so it is now refused. Three fixture cases, plus one for the refusal |
+| `@/app/` with a trailing slash slipped past the zone-root check, and `@/ui/Table/` was a false "private" | Fixed with `path.resolve`. Two fixture cases, one of them an allowed import |
+| The shell could import a zone's internals other than pages | Fixed: a zone is entered only through its `index.ts`. One fixture case |
+| `api`'s DOM ban covered only `window` and `document` | Fixed in part: `location`, `navigator` and `history` added, proven with 3 reports. `globalThis.document`, `self.document` and aliases still pass; recorded in D-16, like D-21's storage-ban gaps |
+| `domain` has no DOM-globals ban in lint | Recorded: D-16 and D-01 give this to `domain`'s own DOM-free compiler settings, which arrive with its first file (plan 04) |
+
+The committed rule, run on the new fixture, left all six new markers unanswered and gave the false
+report: exit 1. The fixture now holds 23 expected violations.
+
+*`/security-review`* found no vulnerabilities, so there was nothing for the false-positive filter to
+check. It examined:
+- the rule's path handling, which only compares strings;
+- the fixture test's `spawnSync`: no shell, fixed arguments;
+- whether the `api` override dropped the storage ban (it repeats it);
+- whether the fixtures can reach the bundle (they cannot).
+
+**Follow-ups**
+
+- *Plan 04 must bring `domain`'s DOM-free tsconfig with its first file (D-01),* and prove it with a
+  `document` in `domain` that fails typecheck. Until then, lint keeps only React out of `domain`.
+
+- *The `@/` alias* lands with its first consumer (plan 04): TypeScript's `paths`, and Vite 8's
+  `resolve.tsconfigPaths`, which is off by default.
+- *Where amounts turn into `bigint`,* given that the generated hooks return strings (QR-2) — D-03.
+- *The fixture test is a plain Node script* because no test runner exists yet. When D-09 brings one, it
+  can move there or stay: it has no dependencies.
