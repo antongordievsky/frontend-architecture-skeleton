@@ -12,10 +12,12 @@ fi
 docker compose build check web
 docker compose run --rm check
 
-# D-21: the production form's headers and cache rules, asserted on the built bundle behind Caddy.
-docker compose --profile prod up -d --build web-prod
-trap 'docker compose --profile prod stop web-prod >/dev/null 2>&1' EXIT
-port=${PROD_PORT:-8080}
+# D-21: the production form's headers and cache rules, asserted on the built bundle behind Caddy. The
+# hook uses its own compose project and port, so a web-prod the developer is running is left alone.
+project=tallyfolio-pre-push
+port=${PRE_PUSH_PORT:-18080}
+PROD_PORT=$port docker compose -p "$project" --profile prod up -d --build web-prod
+trap 'docker compose -p "$project" --profile prod down >/dev/null 2>&1' EXIT
 tries=0
 until curl -fsS -o /dev/null "http://localhost:$port/"; do
   tries=$((tries + 1))
