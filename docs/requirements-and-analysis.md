@@ -650,6 +650,67 @@ hand. This is decided now because every later plan adds rules to whatever is cho
     (QR-1). oxfmt, if it reaches 1.0 and the company moves to it. If the local plugin outgrows itself,
     `eslint-plugin-boundaries` runs in the same JS plugin host.
 
+### D-25 — When do the checks run, and how do commit messages keep to the convention?
+
+`Accepted` 2026-09-10 · needed by plan 02 · build now · judged by QR-15, FR-2, QR-23, QR-24
+
+**What we are deciding.** A check helps only if it runs at the right moment.
+- *Too rarely*, and a broken change sits in the history. In plan 01, a dependency that broke the app's
+  Docker start was caught only by a manual check from a fresh clone.
+- *Too slowly or too often*, and people learn to skip checks.
+
+Commit messages face the same question: reviewers read the history, so a machine should check its format.
+The tension: ready-made tools bring dozens of third-party packages into a project that treats every
+package as a risk, while git's own mechanism needs a few lines we write and prove ourselves.
+
+**Not decided here:**
+- which checks exist (D-10), and the secret scan that joins them (D-21);
+- where tests run (D-09);
+- CI, the only place a skipped hook is caught (D-11).
+
+| Criterion | A — lefthook + commitlint | B — husky + commitlint | C — git's own hooks folder + commitlint | D — git's own hooks folder + a tested header pattern, no packages |
+|---|---|---|---|---|
+| QR-15 commit messages checked | ✅ `config-conventional`: type list, header, lengths, blank lines | ✅ as A | ✅ as A | ⚠️ the header only (type, scope, `!`, lower-case subject, ≤ 100 characters): all 34 of our commits passed, and 7 deliberately bad headers were rejected; body and footer rules unchecked |
+| The Docker gate only when dependencies change (the plan 01 lesson) | ✅ a declarative `glob` | ⚠️ one shell line over `git diff --cached` | ⚠️ as B | ⚠️ as B |
+| How the hooks get switched on | ⚠️ the root `prepare` runs `lefthook install`; the package's own `postinstall` is a third-party install script — ❓ whether Bun's built-in trust list lets it run | ✅ `prepare: husky` | ✅ `prepare: git config core.hooksPath .githooks` | ✅ as C |
+| QR-24 what enters the install | ❌ lefthook: 28 kB plus a 12.9 MB platform binary and a `postinstall` · commitlint: 57 packages, 10 MB, no provenance | ⚠️ husky: 4 kB, no scripts, provenance · commitlint as A | ⚠️ commitlint as A | ✅ nothing |
+| QR-24 maintenance health | ✅ lefthook: commits 2026-09-07, 8.8 k stars · ⚠️ commitlint: last release 2026-08-13, recent commits only from the update bot | ⚠️ husky: last release 2024-11-18, only docs commits in 2026 | ⚠️ commitlint as A | ✅ git itself |
+| QR-21 the company's stack | ❓ the company has no public repositories | ❓ | ❓ | ❓ |
+| Cost of changing later | ✅ | ✅ | ✅ | ✅ the hooks call package scripts, not tools, so moving to A is one commit |
+
+- **Decision:** git's own hooks folder (`.githooks/`, switched on by the root `prepare` script) with three
+  small scripts and no package:
+  - *pre-commit* runs the full `check`. When `package.json` or `bun.lock` is staged, it also builds the
+    image and runs `check` in Docker.
+  - *commit-msg* checks the Conventional Commits header against a pattern that is proven on bad headers.
+  - *pre-push* runs `check` in Docker — the reviewer's environment — as the backstop.
+- **Evidence:** measured 2026-09-10.
+  - *Registry and repositories:* lefthook 2.1.12, husky 9.1.7, `@commitlint/cli` 21.2.2, figures as in the
+    table. commitlint's tree was counted from the registry at latest versions.
+  - *Bun 1.4.2:* in a scratch project it runs the root `prepare` and `postinstall` on plain and frozen
+    installs, and skips both under `--ignore-scripts`. So the image, which has no `.git`, never tries to
+    switch on hooks.
+  - *Timing:* the host `check` took 0.42–0.88 s over three runs.
+  - *Header pattern:* checked against the whole history of `main` and against the deliberate bad and good
+    headers listed above.
+- **Wrong if:**
+  - `check` grows past about 10 s with tests (D-09) — then pre-commit runs format and lint only, and the
+    full `check` moves to pre-push;
+  - message rules grow beyond the header (a required body, issue references, changelogs from commits) —
+    then commitlint, whose 57 packages would then buy something;
+  - the hooks outgrow a few lines each, or need parallel runs — then lefthook;
+  - the company has a house standard — then theirs.
+- **Where it leads:**
+  - *Gains* — no package for the whole mechanism. Every commit, the agent's included, passes the full
+    gate by machine rather than by discipline. A dependency change cannot land without the Docker gate,
+    so plan 01's incident cannot repeat unnoticed.
+  - *Costs* — about twenty lines of shell that we own and prove. The body of a message (why, how
+    verified, IDs) is checked by review, not by a tool, and `ARCHITECTURE.md` names it as such (QR-7). A
+    person can still skip the hooks with `--no-verify`; the agent is denied it, and only CI closes it for
+    people (DR-9).
+  - *Growth path* — CI runs the same `check` and the same pattern (DR-9); lefthook or commitlint when one
+    of the "wrong if" conditions happens.
+
 ## Course corrections
 
 When evidence overturns an assumption — even one never written down — the earlier reasoning stays and
