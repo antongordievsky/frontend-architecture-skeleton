@@ -2,6 +2,13 @@
 # D-25: the backstop before anything leaves the machine: check where the reviewer runs it, in Docker.
 set -eu
 
+# The checks read the working tree, so it must equal HEAD, the commit being pushed.
+if ! git diff --quiet HEAD || [ -n "$(git ls-files --others --exclude-standard)" ]; then
+  echo 'pre-push: the working tree differs from HEAD, so the checks would test something other than' >&2
+  echo 'what is pushed. Commit or stash the changes, then push.' >&2
+  exit 1
+fi
+
 docker compose build check web
 docker compose run --rm check
 

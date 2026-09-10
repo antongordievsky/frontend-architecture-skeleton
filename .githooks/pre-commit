@@ -2,6 +2,14 @@
 # D-25: every commit passes the full gate, the agent's included. D-21: no secret reaches a commit.
 set -eu
 
+# check reads the working tree, so the working tree must be exactly what is committed.
+if ! git diff --quiet || [ -n "$(git ls-files --others --exclude-standard)" ]; then
+  echo 'pre-commit: unstaged or untracked changes are present, so check would test something other' >&2
+  echo 'than this commit. Stage them, or set them aside with `git stash push --include-untracked --' >&2
+  echo '<paths>`, then commit.' >&2
+  exit 1
+fi
+
 # The pinned runtimes live in mise.toml; git may start this hook without mise's shell hook on the PATH.
 run() {
   if command -v mise >/dev/null 2>&1; then mise exec -- "$@"; else "$@"; fi
