@@ -16,6 +16,7 @@
     "format": "biome format --write",
     "lint": "oxlint --deny-warnings",
     "preview": "vite preview",
+    "prepare": "git config core.hooksPath .githooks",
     "graph:build": "codegraph build --no-incremental",
     "graph:update": "codegraph build"
   },

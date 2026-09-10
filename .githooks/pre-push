@@ -1,0 +1,6 @@
+#!/bin/sh
+# D-25: the backstop before anything leaves the machine: check where the reviewer runs it, in Docker.
+set -eu
+
+docker compose build check web
+docker compose run --rm check

@@ -1,0 +1,20 @@
+#!/bin/sh
+# D-25: the Conventional Commits header, checked by a pattern. The body (why, how verified, IDs) is left
+# to review: no tool can judge it (QR-7).
+set -eu
+
+header=$(head -n 1 "$1")
+pattern='^(build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test)(\([a-z0-9-]+\))?!?: [a-z0-9`].{0,90}$'
+
+if printf '%s\n' "$header" | grep -qE "$pattern"; then
+  exit 0
+fi
+
+cat >&2 <<EOF
+commit-msg: the header must read "type(scope): subject" (Conventional Commits, D-25)
+  type     build, chore, ci, docs, feat, fix, perf, refactor, revert, style or test
+  scope    optional and lower-case, e.g. (docker)
+  subject  starts lower-case; the whole header is at most 100 characters
+got: $header
+EOF
+exit 1

@@ -1,0 +1,18 @@
+#!/bin/sh
+# D-25: every commit passes the full gate, the agent's included. D-21: no secret reaches a commit.
+set -eu
+
+# The pinned runtimes live in mise.toml; git may start this hook without mise's shell hook on the PATH.
+run() {
+  if command -v mise >/dev/null 2>&1; then mise exec -- "$@"; else "$@"; fi
+}
+
+run betterleaks git --pre-commit --staged --redact --no-banner .
+run bun run check
+
+# Plan 01's lesson: a dependency change must also pass where the image installs from the lockfile.
+if git diff --cached --name-only | grep -qxE 'package\.json|bun\.lock|bunfig\.toml|Dockerfile|compose\.yaml'; then
+  echo 'pre-commit: dependencies or the image changed, running the Docker gate'
+  docker compose build check web
+  docker compose run --rm check
+fi
