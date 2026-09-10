@@ -53,6 +53,9 @@ Requirements (Part I) are written once and change only with the author's agreeme
 - The entries are the single source for `ARCHITECTURE.md`: its sections are assembled from each entry's
   Decision and Where it leads, not rewritten. If the summary needs different words, fix the entry first.
 - Changing an `Accepted` decision = an amendment written in Part II, agreed first. Never silently.
+- Course corrections are recorded, not erased: when evidence overturns an assumption — even one never
+  written down — the earlier reasoning stays, and a dated entry in Part II § Course corrections says what
+  was assumed, what was found and what changed. `ARCHITECTURE.md` retells that chain of thought.
 
 ## Generators first
 

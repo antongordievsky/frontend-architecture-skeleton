@@ -308,11 +308,12 @@ Options are genuinely different approaches, and the company's own stack is alway
 | D-12 | Which version of the app do we run while developing, and which one do the tests check? | C-2, FR-6, QR-9, QR-11, QR-13, QR-17 | plan 01 |
 | D-22 | How strict should the compiler be, and which version of it do we build on? | QR-1, QR-3, QR-5, QR-13, QR-21 | plan 01 |
 | D-13 | React Compiler | QR-4, QR-21 | plan 01 |
+| D-24 | Which tool turns the backend contract into types — and does it decide our compiler version? | FR-3, QR-5, QR-24, QR-25, QR-21, QR-3 | plan 01, before D-22 |
 | D-10 | Lint, format, hooks, commit conventions | FR-2, QR-7, QR-14, QR-15 | plan 02 |
 | D-21 | Security tooling and agent guardrails | QR-11, DR-6 | plan 02 |
 | D-23 | How do new packages get into the project, and how do we keep them up to date? | QR-24, QR-25, QR-11 | plan 02 |
 | D-16 | Actor zones and rendering strategy per zone | DR-1, DR-4, QR-8 | plan 03 |
-| D-03 | API contract and typing pipeline; runtime validation at the boundary | FR-3, QR-1, QR-5 | plan 04 |
+| D-03 | How server data is fetched, cached and validated at the boundary (the generator itself moved to D-24, CC-01) | FR-3, QR-1, QR-5 | plan 04 |
 | D-08 | Representation of amounts and assets | QR-1, QR-2 | plan 04 |
 | D-04 | Mocking strategy and the dataset generator | FR-3, QR-6, QR-11, C-2 | plan 04 |
 | D-17 | Authentication architecture (design for) | DR-2, QR-11 | plan 04 |
@@ -448,7 +449,7 @@ throttling numbers (D-20), CI/CD and environment parity beyond this machine (D-1
 
 ### D-22 — How strict should the compiler be, and which version of it do we build on?
 
-`Proposed` · needed by plan 01 · build now · judged by QR-1, QR-3, QR-5, QR-13, QR-21
+`Proposed` — on hold until D-24 (CC-01) · needed by plan 01 · build now · judged by QR-1, QR-3, QR-5, QR-13, QR-21
 
 **What we are deciding.** The compiler is the first reviewer of every line. With financial data it should
 reject whole classes of mistakes before the code runs: reading a row that may not exist, treating "no
@@ -458,14 +459,14 @@ is much faster, but it has dropped the programming interface other tools rely on
 that turns the backend contract into types. The question is how strict to be, which conventions become
 mandatory, and which version lets every tool in the chain work today.
 
-**Not decided here:** the contract generator (D-03 — this entry keeps its options open), the lint and
+**Not decided here:** the contract generator (D-24 — this entry keeps its options open), the lint and
 hook setup (D-10), the React Compiler (D-13).
 
 | Criterion | A — TypeScript 7.0.2 (native) | B — TypeScript 6.0.3 | C — TypeScript 5.9.3 |
 |---|---|---|---|
 | QR-3 strict flags reject the deliberate violations | ✅ TS1294, TS2375, TS2532 | ✅ the same, 709 ms | ❓ not run |
 | D-01 DOM-free domain through project references | ✅ TS2584 | ✅ TS2584 | ❓ not run |
-| QR-5 contract → types, D-03 kept open | ❌ no JS API: `openapi-typescript` exits 1; `@hey-api/openapi-ts` supports ≤ 6; only template generators remain | ✅ `openapi-typescript` 7.13.0 generates correctly | ✅ every generator's peer range satisfied |
+| QR-5 contract → types, D-24 kept open | ❌ no JS API: `openapi-typescript` exits 1; `@hey-api/openapi-ts` supports ≤ 6; only template generators remain | ✅ `openapi-typescript` 7.13.0 generates correctly | ✅ every generator's peer range satisfied |
 | QR-13 install without overrides | ⚠️ any tool with a `^5` peer needs one | ⚠️ `openapi-typescript` declares `^5`: npm refused without `--legacy-peer-deps`; Bun ❓ | ✅ |
 | QR-21 the company's posting: "TypeScript strict/modern" | ✅ newest | ⚠️ one major behind — the last release with the JS API | ❌ two majors behind |
 | Typecheck speed (404 files of careero's frontend) | ✅ ≈ 0.47 s — the same 197 diagnostics as 6.0.3 | ⚠️ ≈ 3.6 s — about 7.8× slower | ❓ not run |
@@ -485,11 +486,24 @@ hook setup (D-10), the React Compiler (D-13).
 
 - **Decision:** TypeScript 6.0.3 with `strict` plus `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, `erasableSyntaxOnly` and `verbatimModuleSyntax`, and the conventions above enforced by the compiler and oxlint — `type` over `interface` because the domain is unions and brands, and interfaces merge silently when declared twice.
 - **Evidence:** spikes, 2026-09-10 — 7.0.2 and 6.0.3 reject the same deliberate violations; 7.0.2 has no `main` entry and no `ts.factory`; `openapi-typescript` 7.13.0 generates with 6.0.3 and exits 1 with 7.0.2; oxlint 1.82.0 fired every listed rule, allowed `as const`, and refused an unknown rule name instead of ignoring it. Benchmark on careero's 404 frontend files, three runs each: 6.0.3 ≈ 3.6 s, 7.0.2 ≈ 0.47 s, identical diagnostics. Why the generator fails on 7: it imports `typescript` in 31 files and calls `ts.factory.*` 456 times; in 7 `ts.factory` is undefined (`TypeError … 'createKeywordTypeNode'`), and the replacement ships only as `typescript/unstable/ast/*`. A search of the generator's repository found no issue or pull request about 7.
-- **Wrong if:** D-03 picks a generator that needs no JS API, or `openapi-typescript` supports 7 — then 7 now. If the peer override proves brittle under Bun in plan 01 — then 5.9.3.
+- **Wrong if:** D-24 picks a generator that needs no JS API, or `openapi-typescript` supports 7 — then 7 now. If the peer override proves brittle under Bun in plan 01 — then 5.9.3.
 - **Where it leads:**
-  - *Gains* — money-shaped mistakes fail compilation; conventions are errors, not review comments; every tool in the chain works today; D-03 keeps all its options.
+  - *Gains* — money-shaped mistakes fail compilation; conventions are errors, not review comments; every tool in the chain works today; D-24 keeps all its options.
   - *Costs* — stricter code: every index access and optional field handled precisely; a peer override to own; a slower typecheck than the native compiler; one major behind, which the interview may ask about — the measured answer is the missing JS API.
-  - *Growth path* — three exits from 6, in order of cost: (1) a hybrid — the `typescript@6` package stays for tools while the native 7 binary runs the typecheck in `check`, safe because both report identical diagnostics; worth it once the typecheck takes minutes; (2) 6 → 7 outright once the generator ports to the new API; (3) 7 now with a generator that needs no compiler API — a D-03 question, since those generators also bring runtime schemas. Type-aware lint (oxlint-tsgolint already embeds the native compiler) can replace `assertNever` if it proves insufficient.
+  - *Growth path* — three exits from 6, in order of cost: (1) a hybrid — the `typescript@6` package stays for tools while the native 7 binary runs the typecheck in `check`, safe because both report identical diagnostics; worth it once the typecheck takes minutes; (2) 6 → 7 outright once the generator ports to the new API; (3) 7 now with a generator that needs no compiler API — the D-24 question, since those generators also bring runtime schemas. Type-aware lint (oxlint-tsgolint already embeds the native compiler) can replace `assertNever` if it proves insufficient.
+
+## Course corrections
+
+When evidence overturns an assumption — even one never written down — the earlier reasoning stays and
+the correction is recorded here, dated, with what triggered it. This is the chain of thought
+`ARCHITECTURE.md` retells.
+
+### CC-01 — The contract generator we assumed is no longer maintained · 2026-09-10
+
+- **Assumed:** `openapi-typescript` turns the contract into types, as in the author's earlier template. D-22 therefore chose TypeScript 6.0.3, because the generator crashes on 7.
+- **Found:** measured while explaining that crash — 6.3 M weekly downloads, yet no release since 2026-02-11, no human commit among the last 100 on `main`, not one maintainer reply on the TypeScript 6 issue (#2723, open since March) or the TypeScript 7 issue (#2841), and its core dependency a major behind (`@redocly/openapi-core` ^1.34 against 2.51).
+- **Changed:** the generator moves out of D-03 into D-24, decided before D-22 because the compiler version depends on it; D-22 stays `Proposed`, on hold; QR-24 now checks a package's maintenance health, not only its identity.
+- **Lesson:** popularity is not maintenance. A dependency's health is an input to a decision, measured like any other.
 
 ---
 
@@ -509,4 +523,4 @@ taken from the bottom and recorded in `ARCHITECTURE.md` § Skipped.
 | 06 | UI foundation: tokens, primitives, a11y defaults |
 | 07 | Transactions page: table over 10 000 rows, four states, tests across the trophy |
 | 08 | Observability seam and performance budgets (stretch) |
-| 09 | `ARCHITECTURE.md` assembled from Part II conclusions (Decision, Where it leads), README, AI-layer paragraph, final review |
+| 09 | `ARCHITECTURE.md` assembled from Part II conclusions (Decision, Where it leads) and the course corrections, README, AI-layer paragraph, final review |
