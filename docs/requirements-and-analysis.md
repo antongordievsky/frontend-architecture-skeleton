@@ -449,28 +449,30 @@ throttling numbers (D-20), CI/CD and environment parity beyond this machine (D-1
 
 ### D-22 — How strict should the compiler be, and which version of it do we build on?
 
-`Proposed` — on hold until D-24 (CC-01) · needed by plan 01 · build now · judged by QR-1, QR-3, QR-5, QR-13, QR-21
+`Accepted` 2026-09-10, revised after D-24 · needed by plan 01 · build now · judged by QR-1, QR-3, QR-5, QR-13, QR-21
 
 **What we are deciding.** The compiler is the first reviewer of every line. With financial data it should
 reject whole classes of mistakes before the code runs: reading a row that may not exist, treating "no
 value" as a value, forcing one type into another, and the escape hatch that switches checking off. The
 stricter it is, the more precise the code must be. There is also a version choice: the newest compiler
-is much faster, but it has dropped the programming interface other tools rely on — including the tool
-that turns the backend contract into types. The question is how strict to be, which conventions become
-mandatory, and which version lets every tool in the chain work today.
+is much faster, but it has dropped the programming interface some tools rely on. The question is how
+strict to be, which conventions become mandatory, and which version every tool in our chain can live
+with.
 
-**Not decided here:** the contract generator (D-24 — this entry keeps its options open), the lint and
-hook setup (D-10), the React Compiler (D-13).
+**Not decided here:** the lint and hook setup (D-10), the React Compiler (D-13). The contract generator
+was decided first, because this entry depended on it (D-24, CC-01).
 
 | Criterion | A — TypeScript 7.0.2 (native) | B — TypeScript 6.0.3 | C — TypeScript 5.9.3 |
 |---|---|---|---|
-| QR-3 strict flags reject the deliberate violations | ✅ TS1294, TS2375, TS2532 | ✅ the same, 709 ms | ❓ not run |
+| QR-3 strict flags reject the deliberate violations | ✅ TS1294, TS2375, TS2532 | ✅ the same | ❓ not run |
 | D-01 DOM-free domain through project references | ✅ TS2584 | ✅ TS2584 | ❓ not run |
-| QR-5 contract → types, D-24 kept open | ❌ no JS API: `openapi-typescript` exits 1; `@hey-api/openapi-ts` supports ≤ 6; only template generators remain | ✅ `openapi-typescript` 7.13.0 generates correctly | ✅ every generator's peer range satisfied |
-| QR-13 install without overrides | ⚠️ any tool with a `^5` peer needs one | ⚠️ `openapi-typescript` declares `^5`: npm refused without `--legacy-peer-deps`; Bun ❓ | ✅ |
-| QR-21 the company's posting: "TypeScript strict/modern" | ✅ newest | ⚠️ one major behind — the last release with the JS API | ❌ two majors behind |
-| Typecheck speed (404 files of careero's frontend) | ✅ ≈ 0.47 s — the same 197 diagnostics as 6.0.3 | ⚠️ ≈ 3.6 s — about 7.8× slower | ❓ not run |
-| Cost of changing later | — | ⚠️ for us a version bump — our flags compile on both; the blocker is upstream: `openapi-typescript` builds types through 456 `ts.factory` calls that must be ported to 7's unstable AST API, and no port is visible | ⚠️ two bumps |
+| D-24 contract generator (`orval`) | ✅ generated and typechecked on 7.0.2 | ✅ | ✅ |
+| The rest of the chain: Vite, React plugin, TanStack Router plugin, Vitest | ✅ build, typecheck and tests green; none imports the old JS API; router types reject a missing route (TS2820) and a mistyped search param (TS2322) | ✅ | ❓ not run |
+| QR-13 install without overrides | ✅ no peer conflict in the chain | ✅ | ✅ |
+| QR-21 the company's posting: "TypeScript strict/modern" | ✅ newest | ⚠️ one major behind | ❌ two majors behind |
+| Typecheck speed (404 files of careero's frontend) | ✅ ≈ 0.47 s | ⚠️ ≈ 3.6 s — about 7.8× slower | ❓ not run |
+| Tools that embed the old JS API | ❌ closed until they port — `openapi-typescript` measured; Stryker's TypeScript checker and TypeScript-based docgen are likely (not measured) | ✅ | ✅ |
+| Cost of changing later | ✅ no migration left to carry | ⚠️ the move to 7 still ahead | ⚠️ two moves ahead |
 
 | Convention | Enforced by | Proven by (spike) |
 |---|---|---|
@@ -484,13 +486,13 @@ hook setup (D-10), the React Compiler (D-13).
 | types obey module boundaries — `import type` and `export type … from` are restricted like values (FR-2) | oxlint `no-restricted-imports`, never with `allowTypeImports` | all four forms flagged; with `allowTypeImports: true` the three type forms slip through |
 | every union handled exhaustively | `assertNever(value: never)` in each `default` branch — the compiler, no type-aware lint | proven when the first union lands (QR-23) |
 
-- **Decision:** TypeScript 6.0.3 with `strict` plus `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, `erasableSyntaxOnly` and `verbatimModuleSyntax`, and the conventions above enforced by the compiler and oxlint — `type` over `interface` because the domain is unions and brands, and interfaces merge silently when declared twice.
-- **Evidence:** spikes, 2026-09-10 — 7.0.2 and 6.0.3 reject the same deliberate violations; 7.0.2 has no `main` entry and no `ts.factory`; `openapi-typescript` 7.13.0 generates with 6.0.3 and exits 1 with 7.0.2; oxlint 1.82.0 fired every listed rule, allowed `as const`, and refused an unknown rule name instead of ignoring it. Benchmark on careero's 404 frontend files, three runs each: 6.0.3 ≈ 3.6 s, 7.0.2 ≈ 0.47 s, identical diagnostics. Why the generator fails on 7: it imports `typescript` in 31 files and calls `ts.factory.*` 456 times; in 7 `ts.factory` is undefined (`TypeError … 'createKeywordTypeNode'`), and the replacement ships only as `typescript/unstable/ast/*`. A search of the generator's repository found no issue or pull request about 7.
-- **Wrong if:** D-24 picks a generator that needs no JS API, or `openapi-typescript` supports 7 — then 7 now. If the peer override proves brittle under Bun in plan 01 — then 5.9.3.
+- **Decision:** TypeScript 7.0.2 with `strict` plus `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, `erasableSyntaxOnly` and `verbatimModuleSyntax`, and the conventions above enforced by the compiler and oxlint — `type` over `interface` because the domain is unions and brands, and interfaces merge silently when declared twice.
+- **Evidence:** spikes, 2026-09-10, on 7.0.2 — the deliberate violations rejected; a Vite 8 + React plugin + TanStack Router + Vitest 5 app builds, typechecks and tests green under every strict flag, with no tool importing the old JS API; `orval` output typechecks (D-24). 7.0.2 ships no JS API (`ts.factory` undefined). Benchmark on careero's 404 frontend files, three runs each: 7.0.2 ≈ 0.47 s, 6.0.3 ≈ 3.6 s, identical diagnostics. oxlint 1.82.0 fired every listed rule, allowed `as const`, and refused an unknown rule name instead of ignoring it.
+- **Wrong if:** a tool the project needs cannot run without the old JS API — then that one tool gets `typescript@6` under an alias while the project stays on 7; if several do, B.
 - **Where it leads:**
-  - *Gains* — money-shaped mistakes fail compilation; conventions are errors, not review comments; every tool in the chain works today; D-24 keeps all its options.
-  - *Costs* — stricter code: every index access and optional field handled precisely; a peer override to own; a slower typecheck than the native compiler; one major behind, which the interview may ask about — the measured answer is the missing JS API.
-  - *Growth path* — three exits from 6, in order of cost: (1) a hybrid — the `typescript@6` package stays for tools while the native 7 binary runs the typecheck in `check`, safe because both report identical diagnostics; worth it once the typecheck takes minutes; (2) 6 → 7 outright once the generator ports to the new API; (3) 7 now with a generator that needs no compiler API — the D-24 question, since those generators also bring runtime schemas. Type-aware lint (oxlint-tsgolint already embeds the native compiler) can replace `assertNever` if it proves insufficient.
+  - *Gains* — money-shaped mistakes fail compilation; conventions are errors, not review comments; the native compiler's speed from day one; no migration left to carry.
+  - *Costs* — tools built on the old JS API are closed until they port, so every new dev tool is checked against 7 before it is admitted (QR-24); stricter code everywhere: each index access and optional field handled precisely.
+  - *Growth path* — the alias escape hatch above, per tool; type-aware lint (oxlint-tsgolint already embeds the native compiler) can replace `assertNever` if it proves insufficient.
 
 ### D-24 — Which tool turns the backend contract into types — and does it decide our compiler version?
 
@@ -539,6 +541,7 @@ the correction is recorded here, dated, with what triggered it. This is the chai
 - **Found:** measured while explaining that crash — 6.3 M weekly downloads, yet no release since 2026-02-11, no human commit among the last 100 on `main`, not one maintainer reply on the TypeScript 6 issue (#2723, open since March) or the TypeScript 7 issue (#2841), and its core dependency a major behind (`@redocly/openapi-core` ^1.34 against 2.51).
 - **Changed:** the generator moves out of D-03 into D-24, decided before D-22 because the compiler version depends on it; D-22 stays `Proposed`, on hold; QR-24 now checks a package's maintenance health, not only its identity.
 - **Lesson:** popularity is not maintenance. A dependency's health is an input to a decision, measured like any other.
+- **Outcome:** D-24 chose `orval`, which needs no compiler API; the rest of the chain was then checked on TypeScript 7, and D-22's proposal moved from 6.0.3 to 7.0.2 — the migration it was protecting against is gone.
 
 ---
 
