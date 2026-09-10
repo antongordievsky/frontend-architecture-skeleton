@@ -1,11 +1,25 @@
 // D-16: the code's zones, page modules and layers, as one lint rule. Every import is resolved to the
 // file it names, whether written with `@/` or as a relative path, and checked against the map below.
 // oxlint runs it as a JS plugin, an alpha API (D-10), so lint/layers.test.mjs proves it on every check.
+import { realpathSync } from 'node:fs'
 import path from 'node:path'
 
-// What each layer may import. Zones, their pages and their composites have their own rules below.
+// Real paths, so that a symlinked checkout (macOS /tmp is one) compares equal to itself.
+const real = (p) => {
+  try {
+    return realpathSync(p)
+  } catch {
+    return p
+  }
+}
+
+// This file lives in <repository>/lint, so the rule's `src` option is anchored there, never found by
+// searching the path: a checkout inside some other folder named `src` must not change the answer.
+const ROOT = path.dirname(real(import.meta.dirname))
+
+// What each layer may import outside the zones. Zones have their own rules, in `intoZone`.
 const ALLOWED = {
-  shell: ['shell', 'zone', 'components', 'ui', 'api', 'domain'],
+  shell: ['shell', 'components', 'ui', 'api', 'domain'],
   zone: ['components', 'ui', 'api', 'domain'],
   components: ['components', 'ui', 'api', 'domain'],
   ui: ['ui'],
@@ -13,14 +27,12 @@ const ALLOWED = {
   domain: ['domain'],
 }
 
-const SRC = `${path.sep}src${path.sep}`
-
-// Where a path sits: its layer, its zone, and the module (a folder with an index.ts) it belongs to.
-const locate = (file, zones) => {
-  const at = file.lastIndexOf(SRC)
-  if (at === -1) return undefined
+// Where a path sits under `src`: its layer, its zone, and the module (a folder with an index.ts) it
+// belongs to. Outside `src` the rule has no opinion.
+const locate = (file, src, zones) => {
+  if (!file.startsWith(src + path.sep)) return undefined
   const parts = file
-    .slice(at + SRC.length)
+    .slice(src.length + 1)
     .replace(/\.[cm]?[jt]sx?$/, '')
     .split(path.sep)
   const top = parts[0]
@@ -51,26 +63,43 @@ const isZoneRoot = (at) =>
   at.layer === 'zone' &&
   (at.parts.length === 1 || (at.parts.length === 2 && at.parts[1] === 'index'))
 
-const verdict = (from, to) => {
-  if (from.module && from.module === to.module) return undefined
-  if (from.layer === 'zone' && to.layer === 'zone' && from.zone !== to.zone) {
+// A zone is entered only through its index.ts, and only by the shell; inside it, pages stay apart.
+const intoZone = (from, to) => {
+  const inside = from.layer === 'zone' && from.zone === to.zone
+  if (from.layer === 'zone' && !inside) {
     return `${from.zone}/ may not import ${to.zone}/: zones are isolated`
   }
   if (to.page) {
     if (from.page) {
       return `${from.module} imports ${to.module}: pages never import one another, not even types`
     }
-    if (!(isZoneRoot(from) && from.zone === to.zone)) {
+    if (!(inside && isZoneRoot(from)))
       return `${to.module} is reached only through ${to.zone}/index.ts`
-    }
     if (!isBarrel(to)) return `${to.module} is private: import it through its index.ts`
     return undefined
   }
-  if (isZoneRoot(to) && from.layer !== 'shell')
-    return `${to.zone}/index.ts is imported only by the shell`
+  if (isZoneRoot(to)) {
+    return from.layer === 'shell' ? undefined : `${to.zone}/index.ts is imported only by the shell`
+  }
+  if (!inside) return `${to.zone}/ is reached only through ${to.zone}/index.ts`
   if (to.module && !isBarrel(to)) return `${to.module} is private: import it through its index.ts`
-  if (from.layer === 'zone' && to.layer === 'zone') return undefined
+  return undefined
+}
+
+const verdict = (from, to) => {
+  if (from.module && from.module === to.module) return undefined
+  if (to.layer === 'zone') return intoZone(from, to)
+  if (to.module && !isBarrel(to)) return `${to.module} is private: import it through its index.ts`
   if (!ALLOWED[from.layer].includes(to.layer)) return `${from.layer} may not import ${to.layer}`
+  return undefined
+}
+
+// The path an import names, if it is written out: a string, or a template literal with no `${}`.
+const literal = (node) => {
+  if (node?.type === 'Literal') return node.value
+  if (node?.type === 'TemplateLiteral' && node.expressions.length === 0) {
+    return node.quasis[0].value.cooked
+  }
   return undefined
 }
 
@@ -83,15 +112,20 @@ export default {
         schema: [
           {
             type: 'object',
-            properties: { zones: { type: 'array', items: { type: 'string' } } },
+            properties: {
+              zones: { type: 'array', items: { type: 'string' } },
+              src: { type: 'string' },
+            },
             additionalProperties: false,
           },
         ],
       },
       create(context) {
-        const zones = new Set(context.options[0]?.zones ?? [])
-        const file = context.filename
-        const from = locate(file, zones)
+        const options = context.options[0] ?? {}
+        const zones = new Set(options.zones ?? [])
+        const src = real(path.resolve(ROOT, options.src ?? 'src'))
+        const file = real(context.filename)
+        const from = locate(file, src, zones)
         if (!from) return {}
         const report = (node, message) => context.report({ node, message: `${message} (D-16)` })
         // A file in an unknown folder gets one report, not one more for each of its imports.
@@ -104,14 +138,13 @@ export default {
               ),
           }
         }
-        const src = file.slice(0, file.lastIndexOf(SRC) + SRC.length)
         const check = (node, source) => {
           if (typeof source !== 'string') return
           let target
-          if (source.startsWith('@/')) target = path.join(src, source.slice(2))
+          if (source.startsWith('@/')) target = path.resolve(src, source.slice(2))
           else if (source.startsWith('.')) target = path.resolve(path.dirname(file), source)
           else return
-          const to = locate(target, zones)
+          const to = locate(target, src, zones)
           const message = to && verdict(from, to)
           if (message) report(node, message)
         }
@@ -119,8 +152,19 @@ export default {
           ImportDeclaration: (node) => check(node, node.source.value),
           ExportNamedDeclaration: (node) => node.source && check(node, node.source.value),
           ExportAllDeclaration: (node) => check(node, node.source.value),
-          ImportExpression: (node) =>
-            node.source.type === 'Literal' && check(node, node.source.value),
+          TSImportType: (node) => check(node, literal(node.source)),
+          TSImportEqualsDeclaration: (node) =>
+            node.moduleReference.type === 'TSExternalModuleReference' &&
+            check(node, literal(node.moduleReference.expression)),
+          ImportExpression: (node) => {
+            const source = literal(node.source)
+            if (source === undefined) {
+              report(
+                node,
+                'import() with a computed path cannot be checked against the layer map: use a string literal',
+              )
+            } else check(node, source)
+          },
         }
       },
     },

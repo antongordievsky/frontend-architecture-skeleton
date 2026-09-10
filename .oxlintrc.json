@@ -154,6 +154,18 @@
             "message": "api stays usable by React Native: no DOM (DR-8, CC-04)."
           },
           {
+            "name": "location",
+            "message": "api stays usable by React Native: no DOM (DR-8, CC-04)."
+          },
+          {
+            "name": "navigator",
+            "message": "api stays usable by React Native: no DOM (DR-8, CC-04)."
+          },
+          {
+            "name": "history",
+            "message": "api stays usable by React Native: no DOM (DR-8, CC-04)."
+          },
+          {
             "name": "localStorage",
             "message": "The browser never holds an auth token (DR-2, D-21)."
           },

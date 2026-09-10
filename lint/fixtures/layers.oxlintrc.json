@@ -2,5 +2,7 @@
   "$schema": "../../node_modules/oxlint/configuration_schema.json",
   "categories": { "correctness": "off" },
   "jsPlugins": ["../layers.js"],
-  "rules": { "layers/boundaries": ["error", { "zones": ["app", "admin"] }] }
+  "rules": {
+    "layers/boundaries": ["error", { "zones": ["app", "admin"], "src": "lint/fixtures/layers/src" }]
+  }
 }
