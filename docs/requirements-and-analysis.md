@@ -307,7 +307,7 @@ Options are genuinely different approaches, and the company's own stack is alway
 | D-02 | How do we install the project's building blocks, and which engine runs our tools? | QR-13, QR-11, QR-21, QR-19, FR-6, C-2 | plan 01 |
 | D-12 | Which version of the app do we run while developing, and which one do the tests check? | C-2, FR-6, QR-9, QR-11, QR-13, QR-17 | plan 01 |
 | D-22 | How strict should the compiler be, and which version of it do we build on? | QR-1, QR-3, QR-5, QR-13, QR-21 | plan 01 |
-| D-13 | React Compiler | QR-4, QR-21 | plan 01 |
+| D-13 | Do we let a compiler optimise rendering for us, and which one do we trust? | QR-4, QR-2, QR-9, QR-21, QR-24 | plan 01 |
 | D-24 | Which tool turns the backend contract into types — and does it decide our compiler version? | FR-3, QR-5, QR-24, QR-25, QR-21, QR-3 | plan 01, before D-22 |
 | D-10 | Lint, format, hooks, commit conventions | FR-2, QR-7, QR-14, QR-15 | plan 02 |
 | D-21 | Security tooling and agent guardrails | QR-11, DR-6 | plan 02 |
@@ -528,6 +528,40 @@ they stay out of production (D-04), the compiler version (D-22 — this entry un
   - *Gains* — one contract drives types, calls and mocks, so a backend change breaks the build in all three places at once; D-22 can take the native compiler; the generator is actively maintained.
   - *Costs* — more generated code, and a heavier install to audit; an override to own until upstream bumps `js-yaml`; generated hooks shape the API layer, so D-03 has to accept or narrow them.
   - *Growth path* — a second backend (DR-5) is a second `orval` target with its own contract; the Zod output `orval` also offers is the candidate for runtime validation at the boundary (D-03).
+
+### D-13 — Do we let a compiler optimise rendering for us, and which one do we trust?
+
+`Accepted` 2026-09-10 · needed by plan 01 · build now · judged by QR-4, QR-2, QR-9, QR-21, QR-24
+
+**What we are deciding.** Tables with thousands of rows re-render constantly as people filter and scroll.
+Keeping them fast by hand means wrapping values and handlers in memoisation everywhere — noise that is
+easy to get wrong. The React Compiler does it automatically at build time. Two implementations exist:
+the official one, stable, and a faster native port, still experimental. They behave differently on our
+code: one refuses components that use the big-integer amounts our money model is built on, and neither
+notices a component that changes its own inputs. The question is whether to use a compiler, which one,
+and what must fail loudly instead of silently.
+
+**Not decided here:** lint and hooks (D-10), performance budgets (D-20), where generated data becomes
+read-only (D-03).
+
+| Criterion | A — no compiler; memoise by hand where a profile says so | B — native port (`oxc-transform-react` 0.145, `react({ compiler: true })`) | C — official compiler (`babel-plugin-react-compiler` 1.0 via `@rolldown/plugin-babel`), `panicThreshold: "all_errors"` | D — official compiler, opt-in per component (`"use memo"`) |
+|---|---|---|---|---|
+| QR-4 memoisation without hand-written noise | ❌ by hand | ✅ `Total` memoised | ✅ `Total` memoised (`c(4)`) once literals leave components | ⚠️ only where annotated |
+| QR-21 the company's stack names React Compiler | ❌ | ⚠️ the plugin docs: "Native React Compiler support is experimental" | ✅ the official compiler | ✅ |
+| QR-2 components that use BigInt amounts | ✅ | ✅ compiled | ⚠️ a `0n` inside a component is refused; with `all_errors` the build fails, so the literal moves to the domain, where money logic belongs anyway | ⚠️ as C |
+| A component the compiler cannot handle | — | ❌ no diagnostic, even with `logDiagnostics` | ✅ the build fails and names it | ⚠️ skipped silently by default |
+| A component that mutates its props | ❌ unnoticed | ❌ compiled without a word | ❌ compiled without a word | ❌ |
+| QR-24 what it adds to install and audit | ✅ nothing | ⚠️ one pre-1.0 native package | ⚠️ `@babel/core`, `@rolldown/plugin-babel`, the plugin | ⚠️ as C |
+| Build (this app, unminified, single noisy runs) | 1.14 s | 0.84 s, +1.14 kB runtime | 0.73 s, the same runtime | as C |
+| Cost of changing later | ✅ | ✅ one plugin option | ✅ C → B is one plugin option once the port is stable | ✅ |
+
+- **Decision:** the official React Compiler through `@rolldown/plugin-babel` with `panicThreshold: "all_errors"`, so a component it cannot optimise fails the build instead of shipping silently unoptimised; BigInt literals live in the domain, never inside components; props are typed `readonly`, because neither compiler nor lint catches a component mutating its inputs — the type checker does.
+- **Evidence:** spikes, 2026-09-10, Vite 8 on TypeScript 7 — the official compiler logged `CompileError … Handle BigIntLiteral expressions` and left `Total` unoptimised; with the literal moved to a module constant it compiled all four components; with `all_errors`, a literal inside a component failed the build (exit 1). The native port compiled every component, BigInt included, and gave no diagnostic for `Mutates`; the official one compiled `Mutates` too. oxlint's `purity`, `refs`, `set-state-in-render` and `immutability` rules passed it. `readonly` parameters turned both mutations into compile errors (TS2339, TS2540). `orval`'s models are not read-only (`items: Transaction[]`).
+- **Wrong if:** the native port leaves experimental and passes the same checks — then B, one option; or `all_errors` blocks legitimate code more often than it catches real problems — then `critical_errors` plus a logged report reviewed at wrap-up.
+- **Where it leads:**
+  - *Gains* — memoisation without noise on the table-heavy screens; the compiler's limits become build errors, not silent slowness; money literals stay in the domain, where QR-2 wants them.
+  - *Costs* — Babel back in the build and three packages to audit; a coding rule (no BigInt literals in components) enforced by the build rather than by lint; read-only props to declare, while generated models are mutable — D-03 decides where they become read-only.
+  - *Growth path* — the native port once it is stable; D-20's performance tests measure whether the compiler earns its place on real screens.
 
 ## Course corrections
 
