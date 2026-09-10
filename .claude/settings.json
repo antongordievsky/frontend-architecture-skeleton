@@ -129,7 +129,7 @@
   "sandbox": {
     "enabled": true,
     "autoAllowBashIfSandboxed": false,
-    "excludedCommands": ["docker"],
+    "excludedCommands": ["docker *"],
     "filesystem": {
       "denyRead": ["~/.ssh", "~/.aws", "./.env", "./.env.*"],
       "allowWrite": [
