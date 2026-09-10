@@ -299,7 +299,7 @@ Options are genuinely different approaches, and the company's own stack is alway
 
 | ID | Open question | Judged by | Needed by |
 |---|---|---|---|
-| D-01 | Repository and application shape (single app or workspace; where contract and domain live) | QR-8, QR-5, DR-1, DR-8, C-2 | plan 01 |
+| D-01 | Build the web app as one project, or split it up front into shareable parts? | QR-8, QR-5, DR-1, DR-8, C-2 | plan 01 |
 | D-02 | Package manager and runtime | QR-13, QR-21, C-2 | plan 01 |
 | D-12 | What `docker compose up` serves (dev server vs production build); `check` in Docker | C-2, FR-6, QR-11, QR-13 | plan 01 |
 | D-22 | TypeScript configuration and conventions (flags, `type` vs `interface`, enums, casts) | QR-1, QR-3 | plan 01 |
@@ -324,7 +324,41 @@ Options are genuinely different approaches, and the company's own stack is alway
 
 ## Decisions
 
-*None yet — entries are added here, in the format above, as each plan's decisions are made.*
+### D-01 — Build the web app as one project, or split it up front into shareable parts?
+
+`Accepted` 2026-09-10 · needed by plan 01 · build now · judged by QR-8, QR-5, DR-1, DR-8, C-2
+
+**What we are deciding.** The company will have more than one frontend: the web app today, a public marketing
+and sign-in site, and a planned mobile app. What they could share — the rules for money and transactions,
+and the connection to the backend — can be split out now, before a second product exists, or kept inside
+one project and split out when that product arrives. Splitting now costs setup time for a benefit nobody
+can use yet; not splitting risks the shared rules getting tangled with web-only code, which would make the
+later split expensive. The question is how to take the cheap option now without paying that risk later.
+It comes first because every later decision builds on the shape of the project.
+
+**Not decided here:** layer and zone names (D-16), where generated types go (D-03), the package manager
+(D-02), which layers may use React (D-03, D-16).
+
+| Criterion | A — one Vite app | B — workspace now (`apps/web`, `packages/*`) | C — separate repos / micro-frontends |
+|---|---|---|---|
+| QR-8 pragmatism | ✅ structure matches reality: one consumer | ❌ every package has exactly one consumer | ❌ one team, one app |
+| Boundary strength today | ⚠️ imports by lint; DOM in the domain by the compiler (spike); API layer by lint only | ✅ package manifests; lint still needed inside a package | ✅ the repository boundary |
+| DR-8 domain reusable in React Native | ⚠️ DOM-free now; extraction later is mechanical | ✅ ready | ⚠️ via a published, versioned package |
+| DR-1 separable public zone / SSR | ⚠️ a second Vite entry or extraction later; zone isolation by lint from day one | ✅ `apps/public` fits naturally | ✅ separate deploy |
+| QR-5 backend-agnostic contract | ✅ `contract/` beside the app | ✅ `packages/contract` | ⚠️ a separately published artefact |
+| C-2 Docker | ✅ one install, one image | ⚠️ workspace-aware install | ❌ several images |
+| Cost today (1.5–2 h budget) | ✅ one extra tsconfig | ❌ ≈ 9 extra configs (estimated from the layout, not measured) | ❌ repositories, versioning, federation |
+| FR-1, QR-17 new hire, live extension | ✅ one tree, one recipe | ⚠️ first find the right package | ❌ scattered |
+| Cost of changing later | ⚠️ A → B is mechanical | ✅ none | — |
+| QR-21 the company's stack | ❓ unknown | ❓ unknown; planned React Native hints at a monorepo | ❓ unknown |
+
+- **Decision:** one Vite app; the contract beside it in `contract/`, standing in for the backend's (QR-5); `src/domain` compiles under its own DOM-free tsconfig, so DR-8 is a compiler error, not a convention.
+- **Evidence:** spike, TypeScript 7.0.2, 2026-09-10 — under `lib: ["ES2023"]`, `document` fails (TS2584) and so does `fetch` (TS2304). The DOM-free rule therefore fits `src/domain` only; the API layer is kept React-free by lint.
+- **Wrong if:** a second consumer appears — a separately built public zone (DR-1) or a React Native app (DR-8). Domain and API client then move to packages, mechanically, because they already import no DOM and no React.
+- **Where it leads:**
+  - *Gains* — one install, one config, one image, one `check`; a new hire sees one tree; an interviewer extends it without first learning a package map.
+  - *Costs* — boundaries rest on lint and tsconfig, not on package manifests; every new top-level folder must be added to the rules, or it is silently unconstrained (a gate that checks the gate is a candidate for plan 03).
+  - *Growth path* — the second consumer triggers extraction into packages. React Native would then reuse the domain, the contract and the API client; UI, routing and the credentials part of the transport stay per platform.
 
 ---
 
