@@ -11,7 +11,7 @@ WORKDIR /app
 # Bun's built-in trust list would otherwise let better-sqlite3 (pulled in by the host-only CodeGraph)
 # start a native node-gyp build that the slim image cannot complete.
 FROM base AS deps
-COPY package.json bun.lock ./
+COPY package.json bun.lock bunfig.toml ./
 RUN bun install --frozen-lockfile --ignore-scripts
 
 # Development form: compose bind-mounts the source; node_modules stays in a named volume, never on the host.

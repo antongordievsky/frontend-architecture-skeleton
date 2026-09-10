@@ -1,0 +1,14 @@
+# D-23: packages enter deliberately. package.json's trustedDependencies holds one placeholder, "!none":
+# Bun ignores an empty list and falls back to its built-in list of 367 packages allowed to run install
+# scripts; any named list replaces it, and "!none" can never be a package name.
+
+[install]
+# `bun add` saves the exact version, so every update shows up in package.json's diff.
+exact = true
+# A version younger than 7 days is not installed. A reviewed security fix is named in
+# minimumReleaseAgeExcludes and removed once the version has aged.
+minimumReleaseAge = 604800
+
+[install.cache]
+# A cached manifest lets a young version past the quarantine; fresh metadata closes that (CC-02).
+disableManifest = true
