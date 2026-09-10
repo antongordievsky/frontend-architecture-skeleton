@@ -797,6 +797,90 @@ entry states honestly where each control stops.
     server (D-11). A report-only CSP with an endpoint arrives once monitoring exists (D-19). Nonces are
     needed if the public zone moves to server rendering (D-16).
 
+### D-23 — How do new packages get into the project, and how do we keep them up to date?
+
+`Accepted` 2026-09-10 · needed by plan 02 · build now · judged by QR-24, QR-25, QR-11, QR-13, QR-23
+
+**What we are deciding.** Every package we install is code written by strangers. It runs on our
+machines, and some of it runs in our users' browsers. Attacks now come through that door:
+- a hijacked maintainer account publishes a poisoned version, and the registry and the community need
+  time to spot it;
+- install scripts steal credentials;
+- AI assistants invent package names that attackers then register.
+
+The defences:
+- admit each package deliberately;
+- wait before trusting a fresh version;
+- refuse code that runs at install time;
+- check for known vulnerabilities on every run.
+
+The opposite risk is standing still: a lockfile nobody updates ages into known vulnerabilities. We decide
+how much the package manager already enforces, what we add to it, and what stays a human step.
+
+**Not decided here:**
+- which packages each plan needs (their own decisions);
+- the update bot in CI (D-11);
+- secret scanning (D-21).
+
+| Criterion | A — Bun's own controls, configured | B — A + OSV-Scanner | C — A + Socket | D — frozen installs only (today) |
+|---|---|---|---|---|
+| QR-24 a fresh version waits (quarantine) | ⚠️ `minimumReleaseAge` blocked a 3-day-old version (exit 1), but let it through when the local cache already held it — in 5 of 6 such runs; with `[install.cache] disableManifest = true` it blocked again (CC-02) | ⚠️ as A | ⚠️ as A, plus Socket's own checks ❓ not run | ❌ |
+| A reviewed security fix can skip the wait | ✅ `minimumReleaseAgeExcludes` let exactly one named package through | ✅ as A | ✅ as A | — |
+| QR-24 code that runs at install | ✅ a named `trustedDependencies` list replaces Bun's built-in list of 367 packages. The built-in list includes `better-sqlite3`; its node-gyp build ran under it and did not with a named list. An empty list is ignored (plan 01) | ✅ as A | ✅ as A | ❌ the built-in list applies |
+| QR-24 known vulnerabilities, in `check` | ✅ `bun audit`: 5 advisories on lodash 4.17.20, exit 1; `--audit-level` sets the threshold; our tree is clean (235 packages, 328 ms) | ⚠️ OSV-Scanner 2.5.1 reads `bun.lock` but found 3 of the same 5 — no extra coverage | ❓ not run | ❌ |
+| QR-24 exact versions | ✅ `exact = true` saved `2.5.12` with no caret | ✅ as A | ✅ as A | ⚠️ the template's 8 ranges stay |
+| QR-25 updates on purpose | ✅ `bun outdated` and `bun update` in batches, each through `check`; the quarantine applies to updates as well | ✅ as A | ✅ as A | ❌ nothing prompts an update |
+| What it adds | ✅ one config file | ⚠️ one more binary | ❌ an account and an API token (a secret to manage), and a service that reads our dependency list | ✅ nothing |
+
+- **Decision:** Bun's own controls, set in a committed `bunfig.toml`, plus two human steps.
+  - *Quarantine* — `minimumReleaseAge = 604800` (7 days), with `disableManifest = true` so a warm cache
+    cannot wave a fresh version through (CC-02). `minimumReleaseAgeExcludes` names a package only for a
+    reviewed security fix, and the entry is removed once the version has aged.
+  - *Exact versions* — `exact = true`, and the template's eight ranges are pinned exactly in the same
+    commit.
+  - *No install-time code* — `trustedDependencies` is an explicit list. Nothing we install needs a
+    script today, and Bun ignores an empty list, so the list holds one placeholder, `"!none"`, which can
+    never be a package name. With it, `better-sqlite3`'s node-gyp build did not run; under the built-in
+    list it did.
+  - *Known vulnerabilities* — `bun audit` runs in `check`, and any advisory fails it. An advisory that
+    cannot be fixed is ignored by its ID, with a written reason — never to make `check` pass quietly.
+  - *Admission, a human step* — before proposing a package, the agent verifies it in the registry and its
+    repository: name, age, maintainers, provenance, maintenance health. It writes down the reason, and
+    the author approves; the agent's settings make every package command ask.
+  - *Updates, a human step* — one batch at the start of each plan: `bun outdated`, then `bun update` for
+    the batch, majors one at a time with the changelog read, each batch one commit through `check`.
+- **Evidence:** measured 2026-09-10 on scratch projects with Bun 1.4.2.
+  - *Quarantine* — see the table. A frozen install from our own lockfile passed although it holds
+    oxlint 1.82.0, which is 3 days old. So the quarantine guards the moment a version is added, not
+    reinstalls.
+  - *Built-in trust* — `bun pm default-trusted` lists 367 packages, `better-sqlite3` among them.
+    `bun pm untrusted` reports 0 blocked in our tree today, because everything with scripts is on that
+    list. With `trustedDependencies: ["!none"]`, `better-sqlite3` 13.0.3 installed with exit 0 and no
+    `build/` directory; with the built-in list, node-gyp left `Makefile`, `config.gypi` and `Release/`
+    behind.
+  - *Audit and exact versions* — as in the table; OSV-Scanner's report is from the same lockfile.
+  - *Socket* — the npm `socket` CLI 1.1.170; it was not run, because it needs an account.
+- **Wrong if:**
+  - Bun closes the cache hole — then `disableManifest` goes, if it costs install time;
+  - `disableManifest` makes installs painfully slow — then package changes run in Docker, whose cache
+    starts empty;
+  - a package we need requires an install script — then it joins the list by name, with a reason;
+  - `check` drowns in advisories deep in the tree that cannot be fixed — then `--audit-level=high`, with
+    the reason recorded;
+  - a Bun release changes how the placeholder is read — so the proof is repeated whenever Bun is
+    updated. The fallback: host installs skip scripts, and the hooks of D-25 are switched on by a
+    documented command instead (an amendment to D-25).
+- **Where it leads:**
+  - *Gains* — a poisoned fresh version waits a week before it can reach us, even from a warm cache. No
+    stranger's code runs at install. A known vulnerability fails the same gate as a type error. Every
+    version is exact, so an update always shows up in `package.json`.
+  - *Costs* — `bunfig.toml`'s placeholder needs its explanation. Every install fetches fresh metadata.
+    Security fixes wait up to a week unless named by hand. Admission and update batches remain human
+    steps, which `ARCHITECTURE.md` names as such (QR-7).
+  - *Growth path* — in CI (D-11), a bot proposes updates on the same quarantine, and a fresh cache
+    re-checks every lockfile change. OSV-Scanner earns its place when a second ecosystem arrives, for
+    example a Python AI service (DR-5). Provenance checks arrive when Bun supports them.
+
 ## Course corrections
 
 When evidence overturns an assumption — even one never written down — the earlier reasoning stays and
@@ -810,6 +894,20 @@ the correction is recorded here, dated, with what triggered it. This is the chai
 - **Changed:** the generator moves out of D-03 into D-24, decided before D-22 because the compiler version depends on it; D-22 stays `Proposed`, on hold; QR-24 now checks a package's maintenance health, not only its identity.
 - **Lesson:** popularity is not maintenance. A dependency's health is an input to a decision, measured like any other.
 - **Outcome:** D-24 chose `orval`, which needs no compiler API; the rest of the chain was then checked on TypeScript 7, and D-22's proposal moved from 6.0.3 to 7.0.2 — the migration it was protecting against is gone.
+
+### CC-02 — The package manager's quarantine lets a fresh version through from a warm cache · 2026-09-10
+
+- **Assumed:** D-02 counted Bun's `minimumReleaseAge` as the quarantine QR-24 asks for. The first spike
+  seemed to confirm it: with a 7-day quarantine, a version published that morning was refused.
+- **Found:** when the local cache already held a 3-day-old version (installed without a quarantine),
+  the same setting let it through in 5 of 6 runs. An empty cache blocked it every time. A controlled
+  repeat reproduced it: install without a quarantine, then with one, into the same cache — exit 0.
+  `[install.cache] disableManifest = true` blocked it again. A frozen install does not re-check at all;
+  the quarantine guards only the moment a version is added.
+- **Changed:** D-23 sets `disableManifest = true`, and treats the quarantine as a guard on adding
+  versions, not a re-check of the lockfile. The CI growth path starts from a fresh cache.
+- **Lesson:** a control is trusted only once it has been seen holding in the state it will actually run
+  in — here, a warm cache on a developer's machine — not only in a clean spike.
 
 ---
 
