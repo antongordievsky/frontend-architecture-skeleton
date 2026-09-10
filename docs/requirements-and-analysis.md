@@ -401,6 +401,16 @@ version and flags (D-22).
   - *Costs* — two runtimes to pin and a larger image; Bun on the author's machine (C-2 is unaffected: the image carries both); `bun test` starts Bun's own test runner, not Vitest, so scripts always go through `bun run test`.
   - *Growth path* — C → D is one Dockerfile line once Playwright supports Bun; C → A is regenerating the lockfile.
 
+**Amendment — 2026-09-10: the host's runtimes are pinned in the repository too.** The entry pinned Bun
+and Node for Docker; the host was left to whatever each developer had installed. Now `mise.toml` in the
+repository pins Node 24.21.0 and Bun 1.4.2, and mise (installed with Homebrew, 2026.9.4) puts exactly
+those on the path inside the project — so QR-13's "runtime pinned in a file" holds on every machine, not
+only in the image. Rejected: nvm for Node plus a global `npm install -g bun@1.4.2` — no new tool, but two
+mechanisms and nothing that enforces the Bun version; Bun's install script — a remote script, the risk
+QR-24 guards against. Admission check (QR-24): MIT, 33.7 k stars, four releases in September, a human
+commit on the day. Cost: one more tool, a shell hook, and — for the agent's non-interactive shell —
+shims or `mise exec`, settled in plan 01.
+
 ### D-12 — Which version of the app do we run while developing, and which one do the tests check?
 
 `Accepted` 2026-09-10 · needed by plan 01 · build now · judged by C-2, FR-6, QR-9, QR-11, QR-13, QR-17
