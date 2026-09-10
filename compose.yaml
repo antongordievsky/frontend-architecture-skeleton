@@ -1,0 +1,28 @@
+# C-2: `docker compose up` is the only command needed. Everything runs in Docker (D-12).
+#   docker compose up                      → development, hot reload        http://localhost:5173
+#   docker compose --profile prod up       → the production form, via Caddy http://localhost:8080
+#   docker compose run --rm check          → the full check, no host runtime needed
+services:
+  web:
+    build: { context: ., target: dev }
+    ports: ["${WEB_PORT:-5173}:5173"]
+    volumes:
+      - .:/app
+      # Keeps the image's Linux node_modules: mixing it with a host install breaks native binaries.
+      - node_modules:/app/node_modules
+
+  web-prod:
+    profiles: [prod]
+    build: { context: ., target: prod }
+    ports: ["${PROD_PORT:-8080}:8080"]
+
+  check:
+    profiles: [tools]
+    build: { context: ., target: deps }
+    volumes:
+      - .:/app
+      - node_modules:/app/node_modules
+    command: ["bun", "run", "check"]
+
+volumes:
+  node_modules:

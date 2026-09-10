@@ -1,0 +1,24 @@
+# D-12: the production form. Static bundle, client-route fallback, compression, long cache for
+# hashed assets. The Content-Security-Policy arrives with D-21 (plan 02), together with its test.
+{
+	admin off
+}
+
+:8080 {
+	root * /srv
+	encode zstd gzip
+
+	@hashed path /assets/*
+	header @hashed Cache-Control "public, max-age=31536000, immutable"
+	@entry not path /assets/*
+	header @entry Cache-Control "no-cache"
+
+	header {
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		-Server
+	}
+
+	try_files {path} /index.html
+	file_server
+}
