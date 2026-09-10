@@ -161,7 +161,7 @@ would cost.
 | DR-5 | **AI features as a separate service** (likely Python) | integrates through its own contract; streaming responses (SSE) not precluded by the transport |
 | DR-6 | **Security with AI agents** — development time (agent permissions, secret isolation, vetting external skills and MCP servers) and product time (LLM features read untrusted imported data → prompt injection; least-privilege tools; no financial data to third-party models without consent) | a section in `ARCHITECTURE.md` § Next with the threat list and the first controls |
 | DR-7 | **Monitoring destination and product analytics** — Sentry (S2) behind the QR-10 seam; a typed catalogue of product events | swapping the reporter destination is one file; events are a union type, not strings |
-| DR-8 | **Mobile (React Native planned, S2)** — domain types and the contract client usable outside the web | the domain and API layers import no DOM and no React — lint-enforced |
+| DR-8 | **Mobile (React Native planned, S2)** — domain types and the contract client usable outside the web | the domain imports no DOM and no React; the API layer imports no DOM and no web-only renderer (`react-dom`). React Native runs React and TanStack Query, so the API layer's hooks are allowed. Lint-enforced (amended 2026-09-11, CC-04) |
 | DR-9 | **CI/CD with agentic checks.** Deferred for the take-home (no PR flow; `check` and wrap-up reviews run locally). When it arrives: `check` per push; secret scan, dependency audit, e2e and perf jobs; agent reviewers (code, security) as PR gates with the same rubric used locally; a dependency update bot with the QR-24 quarantine, grouped updates, and auto-merge of patch updates only when `check` is green | `ARCHITECTURE.md` § Next lists the jobs, which local command each mirrors, and the agentic gates |
 | DR-10 | **AI tooling for the project's developers.** Skills and generators that produce new pages, API resources, primitives and tests to this repository's standards, so the standards are applied by construction rather than remembered. Not built now: the standards have to settle first, and building it here would be the over-engineering QR-8 and QR-18 warn against | `ARCHITECTURE.md` § Next names the first candidates — one generator per QR-17 recipe — and how their output is held to the same lint rules and gates as hand-written code |
 | DR-11 | **Development process and environment parity.** How work moves between local development, the local production mode, CI, staging and production, and how close each is to production — hardware included: a test that passes on a fast laptop can fail on the slow CPUs production and CI often run on (S4). Recorded now, decided together with CI/CD | `ARCHITECTURE.md` § Next lists the environments, what each one proves, and how hardware parity is approximated (throttling, QR-9) |
@@ -314,7 +314,7 @@ Options are genuinely different approaches, and the company's own stack is alway
 | D-21 | What keeps secrets and unsafe code out, and what may the agent touch? | QR-11, DR-6, QR-7, QR-23, QR-24 | plan 02 |
 | D-23 | How do new packages get into the project, and how do we keep them up to date? | QR-24, QR-25, QR-11 | plan 02 |
 | D-26 | When the agent starts a container, how much of the machine can that container reach? | DR-6, QR-11, QR-7, QR-8, C-2, FR-6 | deferred by the author — not what the take-home is about |
-| D-16 | Actor zones and rendering strategy per zone | DR-1, DR-4, QR-8 | plan 03 |
+| D-16 | How do we divide the code so everyone knows where things go, and the parts of the product stay apart? | FR-1, FR-2, DR-1, DR-4, DR-8, QR-8, QR-17, QR-21, QR-23 | plan 03 |
 | D-03 | How server data is fetched, cached and validated at the boundary (the generator itself moved to D-24, CC-01) | FR-3, QR-1, QR-5 | plan 04 |
 | D-08 | Representation of amounts and assets | QR-1, QR-2 | plan 04 |
 | D-04 | Mocking strategy and the dataset generator | FR-3, QR-6, QR-11, C-2 | plan 04 |
@@ -361,7 +361,7 @@ It comes first because every later decision builds on the shape of the project.
 | QR-21 the company's stack | ❓ unknown | ❓ unknown; planned React Native hints at a monorepo | ❓ unknown |
 
 - **Decision:** one Vite app; the contract beside it in `contract/`, standing in for the backend's (QR-5); `src/domain` compiles under its own DOM-free tsconfig, so DR-8 is a compiler error, not a convention.
-- **Evidence:** spike, TypeScript 7.0.2, 2026-09-10 — under `lib: ["ES2023"]`, `document` fails (TS2584) and so does `fetch` (TS2304). The DOM-free rule therefore fits `src/domain` only; the API layer is kept React-free by lint.
+- **Evidence:** spike, TypeScript 7.0.2, 2026-09-10 — under `lib: ["ES2023"]`, `document` fails (TS2584) and so does `fetch` (TS2304). The DOM-free rule therefore fits `src/domain` only; the API layer is kept React-free by lint. *Amended 2026-09-11 (CC-04):* the API layer is kept free of the DOM, not of React, because it holds D-24's generated hooks.
 - **Wrong if:** a second consumer appears — a separately built public zone (DR-1) or a React Native app (DR-8). Domain and API client then move to packages, mechanically, because they already import no DOM and no React.
 - **Where it leads:**
   - *Gains* — one install, one config, one image, one `check`; a new hire sees one tree; an interviewer extends it without first learning a package map.
@@ -890,6 +890,140 @@ how much the package manager already enforces, what we add to it, and what stays
     re-checks every lockfile change. OSV-Scanner earns its place when a second ecosystem arrives, for
     example a Python AI service (DR-5). Provenance checks arrive when Bun supports them.
 
+### D-16 — How do we divide the code so everyone knows where things go, and the parts of the product stay apart?
+
+`Accepted` 2026-09-11 · needed by plan 03 · build now (page modules, shared layers, the app zone), design for (the
+public and support zones, rendering) · judged by FR-1, FR-2, DR-1, DR-4, DR-8, QR-8, QR-17, QR-21, QR-23
+
+**What we are deciding.** Every screen draws on the same building blocks: the look and feel, the
+connection to the server, the rules for money. The product also serves three kinds of people:
+taxpayers, visitors to the public site and the support team. Their parts must not leak into each other.
+The question is how the code is divided, so that a developer always knows where something goes and the
+parts cannot quietly grow into each other. Grouping everything by feature keeps a screen together, but
+it tangles the shared rules into screens. Grouping everything by technical role keeps the shared parts
+clean, but it scatters one screen across many folders. It is decided now because every later plan adds
+code, and the rules must exist before the code does.
+
+**Not decided here:**
+- routing (D-05);
+- where generated types sit inside the server layer (D-03, D-24);
+- permissions and the support zone's guard (D-18);
+- the UI kit and what `ui` wraps (D-07);
+- where test files live (D-09).
+
+| Criterion | A — Feature-Sliced Design | B — feature folders over flat shared code | C — page modules in actor zones, over shared layers by role | D — page code in the router's route tree |
+|---|---|---|---|---|
+| FR-1 a new hire knows where code goes | ⚠️ the widget / feature / entity split is what teams argue about | ✅ | ✅ a screen is one folder with a fixed shape; shared code is grouped by role, one purpose per folder | ⚠️ needs the router's file conventions first |
+| FR-2 enforced, type imports included | ⚠️ its linter `steiger` 0.6.0 is a second, pre-1.0 tool | ✅ the same local rule | ✅ spiked: 14 of 14 violations, each with the right reason; 22 allowed imports silent | ⚠️ route files import each other by design |
+| DR-8 domain and server layer usable outside the web | ⚠️ an entity holds its UI together with its model | ❌ a feature mixes calls, types and components; D-01's DOM-free domain would be split per feature | ✅ React refused in `domain` (spiked); `react-dom` and DOM globals refused in `api` (CC-04) | ⚠️ as B |
+| DR-1, DR-4 zones separable | ✅ | ⚠️ a feature spans zones | ✅ zones never import one another (spiked); a zone meets the router only through its `index.ts` | ✅ a zone is a route subtree |
+| QR-8 no structure without a tenant | ❌ three layers empty for one page | ✅ | ✅ only `app/` exists; other zones and shared composites arrive with their first file | ✅ |
+| QR-17 "add a page" recipe | ⚠️ a page, and perhaps a widget and a feature | ✅ | ✅ a folder with its `index.ts`, one line in the zone's `index.ts`, its route | ⚠️ |
+| Prior art (S4) | ⚠️ rejected in we-travel-template: "a larger vocabulary than the domain needs" | ⚠️ we-travel-template removed its `features/` layer: every slice had one consumer, its own page | ✅ careero's zones plus we-travel-template's page modules and barrels | ❓ |
+| QR-21 the company's stack | ❓ their structure is not public | ❓ | ❓ · ✅ fits TanStack Router, whose routes folder is configurable | ✅ the company's router's idiom · ❌ chooses routing ahead of plan 05 (D-05) |
+| Cost today | ⚠️ six layers to explain and map | ✅ | ✅ one local rule of about 90 lines, spike done | ❌ needs the router now |
+| Cost of changing later | ⚠️ | ⚠️ pulling shared rules out of features | ✅ a zone or a layer is one line in the map | ⚠️ |
+
+- **Decision:** page modules inside actor zones, over shared layers grouped by role. A screen is one
+  folder that owns everything only it uses, and it exposes nothing but its `index.ts`. One local lint rule
+  resolves every import, whether written with `@/` or as a relative path, and refuses whatever the layer
+  map does not allow.
+
+  ```
+  src/
+    main.tsx, AppRouter.tsx   the shell: wires the zones through their index.ts
+    app/                      the taxpayer's zone, the only zone today
+      index.ts                what the router may import
+      pages/<Name>/           a page module: index.ts, <Name>Page.tsx, components/, hooks/, sub-pages
+      components/             shared by pages of this zone, on a second consumer
+    components/               shared by zones, on a second zone
+    ui/<Name>/                design-system primitives, one module each (FR-5, D-07)
+    api/                      the transport, the generated client and its hooks (FR-3, D-24); no DOM
+    domain/                   money and transactions; no React, no DOM (D-01)
+  ```
+
+  - *Modules.* A module is a page, a `ui` primitive or a shared composite. Other code imports it only
+    through its `index.ts`. Inside a module anything goes, with relative imports.
+  - *Pages.*
+    - Pages never import one another: not a type, not through `index.ts`.
+    - Only the page's own zone `index.ts` reaches it, and only the shell reaches a zone.
+  - *Zones.* Zones never import one another.
+  - *Shared layers.*
+    - `ui` imports only `ui`, `api` imports only `domain`, and `domain` imports only itself.
+    - `domain` refuses React. `api` refuses `react-dom` and the DOM globals, so it stays usable by
+      React Native. Both are built-in rules.
+    - *Amended 2026-09-11 (CC-04), agreed by the author:* this entry first said `api` has no React. That
+      contradicted D-24, whose generated TanStack Query hooks live in `api`.
+  - *Unknown folders.* A file in a top-level folder the map does not know fails lint, so a new folder
+    arrives together with its row.
+  - *Imports across modules* use `@/`, through TypeScript's `paths` and Vite's `resolve.tsconfigPaths`.
+    The rule resolves relative paths too, so the alias makes imports readable; the rule holds without it.
+  - *Zones (design for).* `public/` and `admin/` get their folder and their row with their first page;
+    `admin/` also gets its guard (D-18). we-travel-template has no zones because it has a single actor.
+    The company has three (§1), and DR-1 asks for a public zone that ships without restructuring the app, so
+    the zone level exists from the first page.
+  - *Rendering (design for).*
+    - The app and support zones are client-rendered, behind sign-in: per-user, data-heavy screens that
+      search engines never see.
+    - The public zone gets static or server rendering through its own build entry. It reaches the
+      shared layers and never another zone.
+- **Evidence:** measured 2026-09-10 and 2026-09-11.
+  - *Spike v2:* oxlint 1.82.0 ran the local rule on a scratch tree. The tree had two zones and two page
+    modules, one of them with a nested sub-page, plus a zone composite, two `ui` modules, `api` and
+    `domain`.
+    - 14 of 14 violations were reported, each with its reason:
+      - the shell reaching a page past its zone;
+      - the zone's `index.ts` reaching into a page;
+      - another page reached through its `index.ts` (a type import), by a lazy `import()` and through its
+        internals;
+      - a `ui` primitive's internals;
+      - a zone composite reaching a page;
+      - `ui` importing `api`, and `api` importing a zone;
+      - another zone, reached by a page and through its `index.ts`;
+      - an unknown folder;
+      - React in `api` and `domain` (a value and a type).
+    - 22 allowed imports stayed silent, including a nested sub-page that uses its page's components.
+    - The first run gave the right count with two wrong reasons: a zone's root (`@/app`) was taken for a
+      shell file. It was fixed, and the reason is now checked, not only the count (QR-23).
+  - *Spike v1:* the same day, the flat five-layer variant caught 12 of 12.
+  - *Registry:*
+    - `steiger` 0.6.0 (2026-07-14; 2 maintainers) and `@feature-sliced/steiger-plugin` 0.7.0;
+    - `@tanstack/router-plugin` 1.168.37 reads `routesDirectory` from the config;
+    - Vite 8.3.0 declares `resolve.tsconfigPaths`, off by default.
+  - *Prior art (S4):*
+    - careero's `frontend-actor-architecture`: isolated zones, a `no-restricted-imports` block per zone;
+    - we-travel-template's `frontend-layering-and-import-boundaries`, with its 2026-09-02 amendment:
+      pages own their screens, the barrel is the boundary, promotion happens on a second consumer, and
+      `@/` is used across modules.
+- **Wrong if:**
+  - one zone needs another zone's screen (support staff seeing a taxpayer's transactions as the
+    taxpayer does). The screen then becomes a shared composite in `components/`. If that becomes the
+    norm, zones are the wrong cut;
+  - an import form the rule cannot resolve appears: a second alias or `#` subpath imports. The rule
+    then learns it, or refuses it;
+  - oxlint's JS plugin API (alpha) changes under an update. The rule's fixture then fails in `check`.
+- **Where it leads:**
+  - *Gains:*
+    - a screen is one folder, so finding something takes no search;
+    - a module can be rearranged without touching its importers;
+    - a zone splits out without untangling pages;
+    - `domain` and `api` stay reusable by a React Native app (DR-8);
+    - a new top-level folder cannot slip past the rules. That closes the cost D-01 noted, and the one
+      we-travel-template's ADR lists: "the override list has to be extended whenever a new top-level
+      folder appears".
+  - *Costs:*
+    - an `index.ts` per module, which can fall out of date with what the module holds;
+    - a hand-written rule on an alpha API. It is guarded by a fixture that must fail in exactly the
+      expected places on every `check`;
+    - on promotion, the choice between `components/` and `ui/` stays a human judgement, named as such in
+      `ARCHITECTURE.md` (QR-7).
+  - *Growth path:*
+    - `components/` on a second consumer;
+    - `public/` and `admin/` with their first page;
+    - flat helpers such as `lib/` join the map with their first file;
+    - `eslint-plugin-boundaries` in the same plugin host if the rule outgrows itself (D-10);
+    - packages when a second app appears (D-01).
+
 ### D-26 — When the agent starts a container, how much of the machine can that container reach?
 
 `Open` — deferred by the author 2026-09-10: not what this take-home is about · design for · judged by
@@ -973,6 +1107,22 @@ the correction is recorded here, dated, with what triggered it. This is the chai
   each proven with EPERM). The container route became D-26, left open and deferred by the author.
 - **Lesson:** an exclusion from a sandbox is only as narrow as everything the excluded program reads.
   List those inputs before trusting the exclusion.
+
+### CC-04 — The server layer was assumed to be free of React · 2026-09-11
+
+- **Assumed:** DR-8 asked the domain and the API layer to import no React. D-01 repeated it, and D-16
+  (accepted the same day) wrote it into the layer map.
+- **Found:** the author walked through the page example and pointed out the usual shape: a transport,
+  plus generated hooks that call it. D-24, accepted in plan 01, had already chosen exactly that: `orval`
+  generates TanStack Query hooks that go through our transport. Those hooks import React, so the rule
+  would have refused what D-24 accepted. DR-8 exists for reuse by React Native, and React Native runs
+  React and TanStack Query. What blocks reuse is the DOM, not React.
+- **Changed:**
+  - DR-8 now asks the domain for no React and no DOM, and the API layer for no DOM and no `react-dom`;
+  - D-16 and D-01 carry dated amendments;
+  - plan 03 bans React in `src/domain/**` only, and `react-dom` and the DOM globals in `src/api/**`.
+- **Lesson:** a new decision is checked against every accepted one, not only against the requirements.
+  This contradiction sat between two accepted entries.
 
 ---
 
