@@ -315,7 +315,7 @@ Options are genuinely different approaches, and the company's own stack is alway
 | D-23 | How do new packages get into the project, and how do we keep them up to date? | QR-24, QR-25, QR-11 | plan 02 |
 | D-26 | When the agent starts a container, how much of the machine can that container reach? | DR-6, QR-11, QR-7, QR-8, C-2, FR-6 | deferred by the author — not what the take-home is about |
 | D-16 | How do we divide the code so everyone knows where things go, and the parts of the product stay apart? | FR-1, FR-2, DR-1, DR-4, DR-8, QR-8, QR-17, QR-21, QR-23 | plan 03 |
-| D-03 | How server data is fetched, cached and validated at the boundary (the generator itself moved to D-24, CC-01) | FR-3, QR-1, QR-5 | plan 04 |
+| D-03 | When the server sends data, how do we make sure it is right before a screen shows it? (the generator itself moved to D-24, CC-01) | FR-3, QR-1, QR-2, QR-5, QR-9, DR-2, DR-5, DR-8, QR-8, QR-24, QR-21 | plan 04 |
 | D-08 | Representation of amounts and assets | QR-1, QR-2 | plan 04 |
 | D-04 | Mocking strategy and the dataset generator | FR-3, QR-6, QR-11, C-2 | plan 04 |
 | D-17 | Authentication architecture (design for) | DR-2, QR-11 | plan 04 |
@@ -534,6 +534,7 @@ they stay out of production (D-04), the compiler version (D-22 — this entry un
 | Cost of changing later | ✅ types only, easy to swap | ⚠️ generated hooks spread through screens; switching to types-only output is one config key | ❓ | ❌ every type by hand |
 
 - **Decision:** `orval` 8.30.0 generates the types, the TanStack Query hooks through our own transport, and the MSW handlers with mock data — all from one contract, with `mock.required: true` and a `js-yaml` override to ≥ 4.3.2 until `orval` ships one.
+  - *Amended 2026-09-11 (CC-05), agreed by the author:* the version is 8.31.0, admitted before the 7-day quarantine as a reviewed security fix through D-23's exclusion. 8.28.1, the newest version past the quarantine, carries 10 published advisories, and 8.30.0 still two. 8.31.0 fixes all of them and ships `js-yaml` 4.3.2, so the override goes. The review runs in plan 04 before the install; the exclusion is removed at plan 05's update batch.
 - **Evidence:** spike, 2026-09-10, on a contract with a `Deposit | Trade` union and a query-parameter enum — generation on TypeScript 7.0.2 exit 0; hooks import our transport; `api.msw.ts` and `api.faker.ts` generated; typecheck under all our strict flags exit 0 after `mock.required: true`; `npm audit` — `js-yaml` 4.3.1 affected (< 4.3.2), npm's own "fix" is a downgrade to orval 7. Registry: MIT, Node ≥ 22.18; `openapi-msw` last release 2025-08.
 - **Wrong if:** the generated hooks fight the cache and query-key conventions D-03 and D-06 settle on — then `orval` emits types and mocks only, and hooks stay hand-written; or its advisories keep recurring faster than it fixes them; or `openapi-typescript` revives with TypeScript 7 support and types-only minimalism wins back.
 - **Where it leads:**
@@ -1067,6 +1068,116 @@ author runs the project, and D-23 is the guard there.
   docker commands are pre-approved, and a container they start is outside the sandbox. It is revisited
   when D-09 puts browsers into Compose, because the mount layout is reopened there anyway.
 
+### D-03 — When the server sends data, how do we make sure it is right before a screen shows it?
+
+`Accepted` 2026-09-11 · needed by plan 04 · build now · judged by FR-3, QR-1, QR-2, QR-5, QR-9, DR-2, DR-5,
+DR-8, QR-8, QR-24, QR-21
+
+**What we are deciding.** Every number on a screen comes from the server. The build already checks our
+code against the contract, but it cannot check the data itself. A backend release, a proxy or a
+half-finished import can send an amount in the wrong shape, and the screen would show it as if it were
+right — in a tax product, the worst kind of failure. We decide whether data is checked when it arrives,
+where it becomes the form the screens work with (money as exact whole numbers), who handles failures
+and retries, and what carries requests to the server. Checking costs code and time on every load;
+trusting the contract costs nothing until the day it is wrong.
+
+**Not decided here:**
+- the generator and its version (D-24);
+- how amounts and assets are modelled (D-08) — this entry decides only where the conversion happens;
+- the mock server and its dataset (D-04);
+- sessions and the reaction to an expired one (D-17) — they live in the transport chosen here;
+- pagination, sorting and how fresh each screen's data must be (D-06); performance budgets (D-20).
+
+| Criterion | A — trust the contract: generated hooks straight into screens | B — the generator checks (orval's runtime validation) | C — one adapter per resource: check with the generated schema and convert to domain types in the query function | D — as C, but converted in `select`, the cache keeps the server's shape |
+|---|---|---|---|---|
+| QR-1 a malformed amount (`1.5` instead of a string) | ❌ reached the caller unchanged (measured) | ⚠️ with our transport: not checked at all; on orval's own `fetch`: caught, as a raw `ZodError` (measured) | ✅ `ApiError { kind: 'contract' }` (measured) | ❓ a throw inside `select` not measured |
+| FR-3 errors reach the UI as one typed shape | ✅ `ApiError`, through the transport's `ErrorType` | ❌ a `ZodError` from outside the transport | ✅ `ApiError` for every query, typed twice over (probes pass) | ✅ |
+| DR-2 the transport is the one exit to the network | ✅ | ⚠️ checking works only on orval's own `fetch`, past our transport; handing the schema to the transport does not compile on 8.28.1 (fixed in 8.31.0) | ✅ | ✅ |
+| QR-2 amounts parsed once, at the boundary | ❌ strings reach components | ❌ checked, still strings | ✅ once per response | ⚠️ once per change, per component subscribed |
+| FR-3 no hand-written payload type | ✅ | ✅ | ✅ schemas and types generated; only the mapping to domain is ours, and a contract change breaks it at compile time | ✅ |
+| D-13 screens get read-only data | ❌ generated models are mutable | ❌ | ✅ domain types are `readonly` | ✅ |
+| What the cache holds | the server's shape | the server's shape | ⚠️ domain objects with `bigint`: `JSON.stringify` throws, so persisting or server-rendering app data needs a serializer; unchanged rows keep their identity across a refetch (measured) | ✅ the server's shape, plain JSON |
+| QR-9 cost on 10 000 rows (1.35 MB) | ✅ none beyond `JSON.parse` (5.4 ms) | ⚠️ as C | ⚠️ check and convert: +4.6 ms with classic Zod, +15.7 ms with Zod Mini; 500 rows ≤ 0.5 ms | ⚠️ as C, per subscriber |
+| QR-8 hand-written code | ✅ none | ✅ none | ⚠️ a query factory and a mapping per resource (≈ 30 lines for transactions) | ⚠️ a hook and a mapping per resource |
+| Cost of changing later | ❌ screens built on strings are rewritten when checking arrives | ⚠️ | ✅ the check can move into the transport without touching a screen | ⚠️ writes to the cache (mutations, optimistic updates) must produce the server's shape while screens think in domain types |
+| QR-21 the company's stack | ✅ TanStack Query | ✅ | ✅ `queryOptions`, the form router loaders prefetch with (D-05) | ✅ |
+
+The transport under the generated calls — the author asked why not `axios`, the usual choice:
+
+| Criterion | `fetch`, wrapped in our function | `axios` 1.20.0 | `ky` 2.1.0 |
+|---|---|---|---|
+| DR-2 one place for credentials, the 401 reaction and error mapping | ✅ the function is that place | ✅ interceptors | ✅ hooks |
+| DR-5 streamed responses (AI features) | ✅ `ReadableStream` | ⚠️ only through its `fetch` adapter (present since 1.7.0) | ✅ built on `fetch` |
+| QR-24 supply-chain record | ✅ nothing to install | ❌ malicious 1.14.1 and 0.30.4 published 2026-03-31 (GHSA-fw8c-xr5c-95f9); 12 advisories July–August 2026, fixed in 1.18.0; one npm maintainer | ⚠️ no advisories; one maintainer; no provenance |
+| QR-8 what it adds | ✅ nothing | ⚠️ 1.98 MB unpacked, four runtime dependencies written for Node (`form-data`, `proxy-from-env`, `follow-redirects`, `https-proxy-agent`) | ✅ no dependencies, 452 kB unpacked |
+| Familiar to a new hire | ⚠️ no interceptors: the transport function is where they would be | ✅ | ⚠️ |
+
+- **Decision:** screens never see the server's shape. One adapter per resource checks every response
+  against the contract and turns it into read-only domain types, money as exact integers, inside the
+  query function, so the cache holds what screens use.
+  - *Adapters* — `api/<resource>.ts` exports a `queryOptions` factory built from the generated query key
+    and request. Its query function checks with the generated schema and maps to `domain` types. Screens
+    import adapters only. The generated client sits in `api/generated/`, private to `api`: lint refuses it
+    anywhere else, with a fixture case. The generated hooks go unused — D-24's "accept or narrow them".
+  - *The check* — generated Zod Mini schemas (`zod.variant: 'mini'`). A failed check is
+    `ApiError { kind: 'contract' }`.
+  - *Transport* — `api/transport.ts`, the generator's mutator, over the browser's `fetch`: credentials,
+    base URL, the 401 reaction (D-17), and one error shape, `network | http | contract`; a cancelled
+    request passes through untouched, never as `network`. It exports
+    `ErrorType`, which the generator makes every generated call's error type; `Register.defaultError`
+    types the adapters' queries the same way.
+  - *Cache policy* — `api/queryClient.ts` owns the defaults. Only network failures and 5xx are retried;
+    a contract or 4xx error shows at once. Freshness per screen is D-06's.
+- **Evidence:** spikes, 2026-09-11, on orval 8.28.1 — the newest version past the D-23 quarantine —
+  TypeScript 7.0.2 under our strict flags, zod 4.5.4, TanStack Query 5.102.8, Node 24.21.0, Bun 1.4.2.
+  - *A malformed payload* (`baseUnits: 1.5`): generated call through our transport, with and without
+    `runtimeValidation` — returned unchanged; orval's own `fetch` with validation — threw a raw
+    `ZodError`; the adapter — threw `ApiError { kind: 'contract' }`. Zod Mini refused it too and accepted
+    the valid one.
+  - *Why B fails with a transport:* orval's source skips response validation when a mutator is set
+    (`!verbOptions.mutator`). Its escape hatch, `includeZodSchemaInArguments`, imports the schema as a type
+    and fails typecheck (TS1361) and runtime (`ReferenceError`) — orval #4058, fixed by #4059 in 8.31.0,
+    which is 1 day old. Validation on orval's own `fetch` failed typecheck as well (TS2552).
+  - *Types:* with `ErrorType` exported from the transport, every generated hook's error type became
+    `ApiError`; both probes — `data` exactly `readonly Transaction[] | undefined`, `error` exactly
+    `ApiError | null` — typecheck for C and for D.
+  - *Retries:* with TanStack Query's defaults, one failing query called its function 4 times and showed
+    the error after 7.0 s.
+  - *Cost:* 10 000 rows, 1 350 KiB, median of 21 runs — `JSON.parse` 5.4 ms; with the classic check
+    9.2 ms, plus conversion 10.0 ms; with Zod Mini 18.7 ms, plus conversion 21.2 ms. Zod with this
+    contract's schemas, minified: classic 86.7 kB (23.7 kB gzip), Mini 21.8 kB (6.9 kB gzip); today's whole app is
+    220 kB (68 kB gzip).
+  - *Cache:* `JSON.stringify` of a `bigint` throws `TypeError`; TanStack Query's structural sharing kept
+    an unchanged row's object and replaced the changed one.
+  - *Cancellation* (a local server that answers after 500 ms; run outside the sandbox, which refuses to
+    listen): a component unsubscribing after 100 ms aborted the real request — the signal reached
+    `fetch` through the adapter, the generated call and the transport; `fetch` rejected with
+    `AbortError`; the server saw the abort; the query went back to `pending`/`idle` with no error.
+  - *What the check covers:* it refused a missing field, `"1.5"`, `decimals: 40` and an unknown `kind`,
+    dropped an extra field, and accepted `"999"` with 18 decimals — it checks the shape the contract
+    describes, not the value.
+  - *Registry:* as in the transport table; zod 4.5.4 — MIT, one maintainer, provenance, no dependencies.
+- **Wrong if:**
+  - app data has to be persisted or server-rendered (offline, SSR) — then a serializer for `bigint`, or
+    the conversion moves to `select` (D);
+  - D-06 keeps 10 000 rows on the client and D-20's throttled run finds the Mini check in a long task —
+    then classic Zod: its check measured 3.5 times faster (3.8 against 13.2 ms), 17 kB gzip heavier;
+  - the check through the transport works on orval 8.31.0 (installed in plan 04, CC-05) — then it moves
+    there, so no resource can forget it, and adapters keep only the conversion.
+- **Where it leads:**
+  - *Gains* — an amount in the wrong shape becomes an error state, never a wrong number on a tax screen;
+    screens work only with exact, read-only domain types; credentials, 401 and retries each change in one
+    file; the server's shape never leaves `api`, so a contract change stops at the adapter. Adding an API
+    resource is a recipe (QR-17): the contract, generate, an adapter.
+  - *Costs* — an adapter per resource; until the check moves into the transport, each adapter must call
+    it, which a test per adapter holds (D-09); a cache of domain objects needs a serializer before it can
+    be persisted; about 13 ms of checking per 10 000 rows and 7 kB gzip; the check proves the shape, not
+    the value, so it is only as strict as the contract.
+  - *Growth path* — the check moves into the transport once orval 8.31.0's schema hand-off proves out in
+    plan 04; a second service (DR-5) is a
+    second generated client behind the same transport, and streamed answers use `fetch`'s stream; a React
+    Native app reuses `api` as it is, because nothing in it touches the DOM.
+
 ## Course corrections
 
 When evidence overturns an assumption — even one never written down — the earlier reasoning stays and
@@ -1127,6 +1238,29 @@ the correction is recorded here, dated, with what triggered it. This is the chai
   - plan 03 bans React in `src/domain/**` only, and `react-dom` and the DOM globals in `src/api/**`.
 - **Lesson:** a new decision is checked against every accepted one, not only against the requirements.
   This contradiction sat between two accepted entries.
+
+### CC-05 — The generator's pinned version could not be installed, and was not safe · 2026-09-11
+
+- **Assumed:** D-24 pinned `orval` 8.30.0 and counted one advisory, in `js-yaml`, answered by an
+  override.
+- **Found:** measured during D-03's spike.
+  - D-23's quarantine refuses 8.30.0, which is 3.8 days old; the newest version past it is 8.28.1.
+  - orval's repository published 10 advisories between 2026-09-06 and 2026-09-10, 7 of them critical,
+    all code injection from a hostile contract. They are patched across 8.29.0, 8.30.0 and 8.31.0, so
+    8.30.0 still carries two.
+  - The global advisory database, which `bun audit` reads, had none of the ten: `check` would have
+    passed on a vulnerable version.
+  - 8.31.0, one day old and without provenance, fixes all ten, ships `js-yaml` 4.3.2, and carries
+    orval #4059, which D-03's check in the transport needs.
+- **Changed:**
+  - D-24 is amended to 8.31.0, admitted through D-23's exclusion for a reviewed security fix. The
+    review runs in plan 04 before the install: the publisher, install scripts, and the commits and files
+    between the two tags. If any of it fails, the choice returns to the author.
+  - The `js-yaml` override goes.
+  - The exclusion is removed at plan 05's update batch, once the version has aged.
+- **Lesson:** a pinned version is a measurement with a date. `bun audit` sees only the global database,
+  and a project's own advisories reach it days later. A tool whose recent releases are security fixes is
+  checked at its source as well.
 
 ---
 
