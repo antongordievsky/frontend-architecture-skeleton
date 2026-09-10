@@ -306,7 +306,7 @@ Options are genuinely different approaches, and the company's own stack is alway
 | D-01 | Build the web app as one project, or split it up front into shareable parts? | QR-8, QR-5, DR-1, DR-8, C-2 | plan 01 |
 | D-02 | How do we install the project's building blocks, and which engine runs our tools? | QR-13, QR-11, QR-21, QR-19, FR-6, C-2 | plan 01 |
 | D-12 | Which version of the app do we run while developing, and which one do the tests check? | C-2, FR-6, QR-9, QR-11, QR-13, QR-17 | plan 01 |
-| D-22 | TypeScript configuration and conventions (flags, `type` vs `interface`, enums, casts) | QR-1, QR-3 | plan 01 |
+| D-22 | How strict should the compiler be, and which version of it do we build on? | QR-1, QR-3, QR-5, QR-13, QR-21 | plan 01 |
 | D-13 | React Compiler | QR-4, QR-21 | plan 01 |
 | D-10 | Lint, format, hooks, commit conventions | FR-2, QR-7, QR-14, QR-15 | plan 02 |
 | D-21 | Security tooling and agent guardrails | QR-11, DR-6 | plan 02 |
@@ -445,6 +445,51 @@ throttling numbers (D-20), CI/CD and environment parity beyond this machine (D-1
   - *Gains* — tests exercise the bundle and headers users get; a failing test opens by hand in the same mode; development keeps instant feedback.
   - *Costs* — two modes to keep working; a production build before each browser-test run; a Caddyfile to own; editing inside Docker on Windows needs polling.
   - *Growth path* — the production stage becomes the deploy artefact; CI runs the same profile and tests (D-11); staging and hardware parity are DR-11.
+
+### D-22 — How strict should the compiler be, and which version of it do we build on?
+
+`Proposed` · needed by plan 01 · build now · judged by QR-1, QR-3, QR-5, QR-13, QR-21
+
+**What we are deciding.** The compiler is the first reviewer of every line. With financial data it should
+reject whole classes of mistakes before the code runs: reading a row that may not exist, treating "no
+value" as a value, forcing one type into another, and the escape hatch that switches checking off. The
+stricter it is, the more precise the code must be. There is also a version choice: the newest compiler
+is much faster, but it has dropped the programming interface other tools rely on — including the tool
+that turns the backend contract into types. The question is how strict to be, which conventions become
+mandatory, and which version lets every tool in the chain work today.
+
+**Not decided here:** the contract generator (D-03 — this entry keeps its options open), the lint and
+hook setup (D-10), the React Compiler (D-13).
+
+| Criterion | A — TypeScript 7.0.2 (native) | B — TypeScript 6.0.3 | C — TypeScript 5.9.3 |
+|---|---|---|---|
+| QR-3 strict flags reject the deliberate violations | ✅ TS1294, TS2375, TS2532 | ✅ the same, 709 ms | ❓ not run |
+| D-01 DOM-free domain through project references | ✅ TS2584 | ✅ TS2584 | ❓ not run |
+| QR-5 contract → types, D-03 kept open | ❌ no JS API: `openapi-typescript` exits 1; `@hey-api/openapi-ts` supports ≤ 6; only template generators remain | ✅ `openapi-typescript` 7.13.0 generates correctly | ✅ every generator's peer range satisfied |
+| QR-13 install without overrides | ⚠️ any tool with a `^5` peer needs one | ⚠️ `openapi-typescript` declares `^5`: npm refused without `--legacy-peer-deps`; Bun ❓ | ✅ |
+| QR-21 the company's posting: "TypeScript strict/modern" | ✅ newest | ⚠️ one major behind — the last release with the JS API | ❌ two majors behind |
+| Typecheck speed (404 files of careero's frontend) | ✅ ≈ 0.47 s — the same 197 diagnostics as 6.0.3 | ⚠️ ≈ 3.6 s — about 7.8× slower | ❓ not run |
+| Cost of changing later | — | ⚠️ for us a version bump — our flags compile on both; the blocker is upstream: `openapi-typescript` builds types through 456 `ts.factory` calls that must be ported to 7's unstable AST API, and no port is visible | ⚠️ two bumps |
+
+| Convention | Enforced by | Proven by (spike) |
+|---|---|---|
+| no `enum` or `namespace` — unions of literals and `as const` objects | `erasableSyntaxOnly` | TS1294 |
+| index access yields `T \| undefined` | `noUncheckedIndexedAccess` | TS2532 |
+| an optional field is absent, not `undefined` | `exactOptionalPropertyTypes` | TS2375 |
+| no `any`; no non-null `!` | oxlint `no-explicit-any`, `no-non-null-assertion` | both fired |
+| no `as` casts outside boundary parsers; `as const` and `satisfies` stay | oxlint `consistent-type-assertions: never`, overridden for boundary modules | fired on `as Amount`, not on `as const` |
+| `type`, not `interface` (`.d.ts` augmentation excepted) | oxlint `consistent-type-definitions: type` | fired |
+| type-only imports are explicit | `verbatimModuleSyntax`, oxlint `consistent-type-imports` | fired |
+| types obey module boundaries — `import type` and `export type … from` are restricted like values (FR-2) | oxlint `no-restricted-imports`, never with `allowTypeImports` | all four forms flagged; with `allowTypeImports: true` the three type forms slip through |
+| every union handled exhaustively | `assertNever(value: never)` in each `default` branch — the compiler, no type-aware lint | proven when the first union lands (QR-23) |
+
+- **Decision:** TypeScript 6.0.3 with `strict` plus `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, `erasableSyntaxOnly` and `verbatimModuleSyntax`, and the conventions above enforced by the compiler and oxlint — `type` over `interface` because the domain is unions and brands, and interfaces merge silently when declared twice.
+- **Evidence:** spikes, 2026-09-10 — 7.0.2 and 6.0.3 reject the same deliberate violations; 7.0.2 has no `main` entry and no `ts.factory`; `openapi-typescript` 7.13.0 generates with 6.0.3 and exits 1 with 7.0.2; oxlint 1.82.0 fired every listed rule, allowed `as const`, and refused an unknown rule name instead of ignoring it. Benchmark on careero's 404 frontend files, three runs each: 6.0.3 ≈ 3.6 s, 7.0.2 ≈ 0.47 s, identical diagnostics. Why the generator fails on 7: it imports `typescript` in 31 files and calls `ts.factory.*` 456 times; in 7 `ts.factory` is undefined (`TypeError … 'createKeywordTypeNode'`), and the replacement ships only as `typescript/unstable/ast/*`. A search of the generator's repository found no issue or pull request about 7.
+- **Wrong if:** D-03 picks a generator that needs no JS API, or `openapi-typescript` supports 7 — then 7 now. If the peer override proves brittle under Bun in plan 01 — then 5.9.3.
+- **Where it leads:**
+  - *Gains* — money-shaped mistakes fail compilation; conventions are errors, not review comments; every tool in the chain works today; D-03 keeps all its options.
+  - *Costs* — stricter code: every index access and optional field handled precisely; a peer override to own; a slower typecheck than the native compiler; one major behind, which the interview may ask about — the measured answer is the missing JS API.
+  - *Growth path* — three exits from 6, in order of cost: (1) a hybrid — the `typescript@6` package stays for tools while the native 7 binary runs the typecheck in `check`, safe because both report identical diagnostics; worth it once the typecheck takes minutes; (2) 6 → 7 outright once the generator ports to the new API; (3) 7 now with a generator that needs no compiler API — a D-03 question, since those generators also bring runtime schemas. Type-aware lint (oxlint-tsgolint already embeds the native compiler) can replace `assertNever` if it proves insufficient.
 
 ---
 
