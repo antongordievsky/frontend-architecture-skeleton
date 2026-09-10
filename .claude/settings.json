@@ -132,12 +132,13 @@
     "excludedCommands": ["docker *"],
     "filesystem": {
       "denyRead": ["~/.ssh", "~/.aws", "./.env", "./.env.*"],
-      "allowWrite": [
-        "~/.bun",
-        "~/.cache",
-        "~/.local/share/mise",
-        "~/.local/state/mise",
-        "~/.docker"
+      "allowWrite": ["~/.bun", "~/.cache", "~/.local/share/mise", "~/.local/state/mise"],
+      "denyWrite": [
+        "./compose*.yaml",
+        "./compose*.yml",
+        "./docker-compose*.yaml",
+        "./docker-compose*.yml",
+        "./.env"
       ]
     },
     "network": {
