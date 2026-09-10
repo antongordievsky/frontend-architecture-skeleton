@@ -1,1 +1,6 @@
 .idea
+
+# Environment files hold real values and never enter git; only the placeholder template does.
+.env
+.env.*
+!.env.example
