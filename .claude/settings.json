@@ -17,6 +17,20 @@
       "Bash(git switch *)",
       "Bash(git merge --ff-only *)"
     ],
+    "ask": [
+      "Bash(bun add*)",
+      "Bash(bun remove*)",
+      "Bash(bun update*)",
+      "Bash(bun x *)",
+      "Bash(bunx *)",
+      "Bash(npx *)",
+      "Bash(npm install*)",
+      "Bash(npm i *)",
+      "Bash(npm update*)",
+      "Bash(pnpm add*)",
+      "Bash(pnpm update*)",
+      "Bash(pnpm dlx*)"
+    ],
     "deny": [
       "Read(./.env)",
       "Read(./.env.local)",

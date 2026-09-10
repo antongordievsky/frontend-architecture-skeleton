@@ -88,8 +88,15 @@ Requirements (Part I) are written once and change only with the author's agreeme
 - The browser never holds an auth token (DR-2); token storage and `dangerouslySetInnerHTML` are lint
   errors. Untrusted data (memos, imported fields) renders as text.
 - Telemetry and logs never carry financial data or PII — scrubbed at the reporter seam (QR-10).
-- Dependencies: frozen lockfile, audit in `check`, a written reason for each new one. New MCP servers
-  and external agent skills are reviewed before they are added — they run with the agent's rights.
+- Packages (QR-24): the agent never adds, removes or updates a package without the author's explicit go
+  — package commands always ask (`.claude/settings.json`). Before proposing a package, verify it in the
+  registry: the exact name exists and is the intended one, its age, maintainers, repository and
+  provenance. A name recalled from memory is not verified — invented package names are a known attack.
+- One-off runners (`npx`, `bunx`, `bun x`) download and execute code; they ask first as well.
+- Installs are frozen, the audit runs in `check`, each new package has a written reason, and updates
+  are a deliberate batch (QR-25) — never a side effect of another change.
+- New MCP servers and external agent skills are reviewed before they are added — they run with the
+  agent's rights.
 - A control no tool can enforce is named as such in `ARCHITECTURE.md` — never silently assumed.
 
 ## Scope control
