@@ -8,7 +8,22 @@ This file is the working agreement: how work happens here. It does not restate t
 
 ## Commands
 
-Filled by plan 01 (scaffold). Until then there is no code and nothing to run.
+Everything runs in Docker (C-2). Host commands use the runtimes pinned in `mise.toml` (`mise install`).
+
+| What | Command |
+|---|---|
+| Development, hot reload — http://localhost:5173 | `docker compose up` |
+| Production form via Caddy — http://localhost:8080 | `docker compose --profile prod up` |
+| Full check, in Docker | `docker compose run --rm check` |
+| Full check, on the host | `mise exec -- bun run check` |
+| Typecheck only | `mise exec -- bun run typecheck` |
+| Refresh the code index | `mise exec -- bun run graph:update` (`graph:build` rebuilds from scratch) |
+
+- `WEB_PORT` and `PROD_PORT` override 5173 and 8080 when they are taken.
+- `check` grows with each plan: today typecheck and build; lint and format arrive in plan 02, tests in
+  plan 04.
+- The agent's shell is non-interactive and has no mise hook — on its own it picks nvm's Node — so the
+  agent runs every project command through `mise exec --`. Package changes ask the author either way.
 
 ## Workflow
 

@@ -1,6 +1,6 @@
 # Plan 01 — Scaffold: a running app in Docker, on the decided toolchain
 
-**Status:** in progress — GREEN LIGHT 2026-09-10 · **Timebox:** 30 min of execution
+**Status:** done — 2026-09-10 · **Timebox:** 30 min of execution (overrun, see the log)
 **Serves:** C-2, QR-3, QR-13, QR-19, QR-20, QR-23 · **Applies:** D-01, D-02, D-12, D-13, D-22 (D-24 lands in plan 04)
 
 ## Why this plan exists
@@ -38,7 +38,7 @@ visible hand edit.
 | Decision | What it becomes here |
 |---|---|
 | D-01 one app | the repository root is the app; `contract/` and `src/domain/` are created when their first file lands (plan 04), not now — no empty folders (QR-8) |
-| D-02 Bun + Node | `packageManager: bun@1.4.2`, `.node-version` 24.21.0, one `bun.lock`, frozen installs everywhere automated |
+| D-02 Bun + Node | `packageManager: bun@1.4.2`, `mise.toml` pinning Node 24.21.0 and Bun 1.4.2 for the host (D-02 amendment), one `bun.lock`, frozen installs everywhere automated |
 | D-22 TypeScript 7.0.2 | exact pin; `strict` plus the four flags in `tsconfig.app.json`; `typecheck` = `tsc -b` |
 | D-13 React Compiler | `@rolldown/plugin-babel` + `babel-plugin-react-compiler` 1.0.0, `reactCompilerPreset({ panicThreshold: "all_errors" })` |
 | D-12 two modes | multi-stage `Dockerfile` (Node image + Bun binary → deps → dev / build → Caddy 2.11.4-alpine), `compose.yaml` with `web`, `web-prod` (profile `prod`) and `check` (profile `tools`) |
@@ -108,4 +108,98 @@ routing (plan 05).
 
 ## What happened
 
-*Filled at wrap-up: deviations, surprises, commands run with versions, how each gate was proven.*
+Executed 2026-09-10 on `build/01-scaffold`. The execution ran over its 30-minute timebox; most of the
+overrun went into the Docker incident below.
+
+**Deviations and surprises**
+
+1. *The agent's shell did not see mise.* It is a login but non-interactive shell, started before the
+   author added the hook, so it resolved nvm's Node 24.15.0. `mise exec --` gives exactly the pinned
+   Node 24.21.0 and Bun 1.4.2, so every project command runs through it (`CLAUDE.md` § Commands).
+2. *Babel 8, not 7.* Bun resolved `@babel/core` to 8.0.1 where the spike had 7.29.7. `@rolldown/plugin-babel`
+   declares `^7.29 || ^8`, and the build is green on 8, so it stays.
+3. *A hole in our own guardrail.* The "ask" rules matched `bun add` but not `mise exec -- bun add` — wrapping
+   a command bypassed them. Closed in step 7; until then every package in this plan was installed with a
+   plain `bun add`, so the author was asked each time.
+4. *Incident — step 7 broke `docker compose up`.* CodeGraph pulls `better-sqlite3`; Bun's built-in trust
+   list lets it start a native node-gyp build, which the slim image cannot complete. My step-7 check ran on
+   the host only; the fresh-clone verification caught it. First fix tried: an empty `trustedDependencies`
+   list — it did not stop the build (Bun's defaults still applied), so it was removed rather than kept as a
+   control that controls nothing. The fix: the image installs with `--ignore-scripts`; nothing the app
+   builds with needs an install script. Step 7's commit was amended — it had been neither reviewed nor
+   merged — so no red commit reaches `main`. Lesson for plan 02: a commit that changes dependencies must
+   also pass the Docker gate, and a hook should enforce it rather than memory.
+5. *`README.md` changed under us* — reformatted, most likely by the IDE. The author confirmed it was not
+   intended; restored to the task text.
+
+**Gates proven (QR-23)**
+
+| Gate | Deliberate break | Result |
+|---|---|---|
+| strict flags | an `enum`, an unchecked index access, `undefined` in an optional field | TS1294, TS2532, TS2375; clean again after removal |
+| React Compiler, `all_errors` | a `0n` literal inside a component | `vite build` exit 1; the unminified bundle otherwise carries the compiler runtime |
+| frozen lockfile | a dependency added to `package.json` only | image build exit 1: "lockfile had changes, but lockfile is frozen" |
+| `check` in Docker | a type error | exit 1 (TS2322) |
+
+**Measured along the way**
+
+- Bun with TypeScript 7.0.2: no peer warnings — the open question from D-02, answered for this chain.
+- Caddy against nginx (D-12 promised to confirm): 18 against 21 lines for an equivalent, `nginx -t`-valid
+  config. Length is not the argument; nginx drops inherited `add_header` directives inside any `location`
+  that sets its own, so security headers must be repeated per location, and its alpine image has no zstd.
+- Playwright MCP's browser path: headless system Chrome opened the dev server and read the heading and the
+  accessibility tree. The MCP tools themselves load at the next session start.
+- `bun audit`: nothing in 235 packages. Against QR-24: `@playwright/mcp` 0.0.80 pulls a pre-release,
+  `playwright` 1.63.0-alpha-2026-08-31.
+- From a fresh clone: dev answers 200 in 6 s and production 200 in 4 s with warm image layers — a
+  reviewer's cold first run takes longer and is still to be measured; `/transactions` falls back to
+  `index.html`; `check` in Docker exits 0.
+
+**Versions used:** create-vite 9.2.1 (via `bunx`), Bun 1.4.2, mise 2026.9.4, Node 24.21.0, TypeScript 7.0.2,
+Vite 8.3.0, `@babel/core` 8.0.1, `babel-plugin-react-compiler` 1.0.0, CodeGraph 3.17.0, Playwright MCP
+0.0.80; images `node:24.21.0-slim`, `oven/bun:1.4.2-slim`, `caddy:2.11.4-alpine`.
+
+**Reviews at wrap-up**
+
+`/code-review` (medium) raised four findings. All four are fixed, each in its own commit:
+
+1. *A missing hashed asset got the app shell, cached for a year.* The `index.html` fallback also caught
+   `/assets/*`, and the asset matcher then stamped the HTML `immutable`. Now a missing asset answers 404;
+   only files that exist get the long cache. Measured before → after: `/assets/does-not-exist.js`
+   200 `text/html` immutable → 404.
+2. *The `node_modules` volume went stale.* It outlives image rebuilds, so a dependency change was never
+   seen by dev or `check`. Both now re-sync the volume with `bun.lock` on start, which is a no-op in
+   4–70 ms when nothing changed. Proof: with `react` deleted from the volume, the old command fails
+   (`failed to resolve import "react"`), and the new one reinstalls and passes.
+3. *`check` in Docker wrote a root-owned `dist/` into the tree on Linux hosts.* `check` now builds into
+   `node_modules/.cache/check-build`, which is a volume in Docker and ignored on the host. `build` still
+   writes `dist/`.
+4. *Allow rules with wildcards on commands that run code* — `bun run *`, `node_modules/.bin/*`,
+   `docker compose --profile *` and `docker compose run --rm check*`. They auto-approved arbitrary code,
+   which gets around both the deny rules and the package ask rules. Now only exact commands are allowed.
+
+`/security-review` raised two candidates. The false-positive pass rated both 7/10, below the report's
+threshold of 8, so the formal report is empty. Both were fixed anyway, because each breaks a control
+`CLAUDE.md` claims:
+
+- the wildcard rules, the same as code-review finding 4;
+- the blanket `mcp__playwright` allow, which auto-approved `browser_run_code_unsafe`. That tool runs any
+  JavaScript in the server process on the host; it is on by default in 0.0.80. Now Playwright tools are
+  allowed one by one, and `browser_run_code_unsafe` and `browser_file_upload` are denied. The same pass
+  found that `git diff --no-index` reads any file; it is denied too.
+
+Two things remain open:
+
+- *Not closed:* permission rules match command strings, not behaviour, so a reordered flag or a new option
+  on an allowed tool can still reach outside the repository. The hard guarantee is an OS-level sandbox
+  for the agent — for D-21 to decide (plan 02).
+- *Not proven (QR-23):* the narrowed rules have not been seen stopping a command. Proving them means
+  deliberately prompting the author, so this proof waits for D-21's sandbox decision.
+
+**Follow-ups:**
+- plan 02:
+  - a hook runs the Docker gate on dependency changes;
+  - the Caddy cache and fallback behaviour gets an automated test, alongside the CSP test (D-21);
+  - the agent sandbox (D-21);
+- D-23 — whether the host also installs with scripts off (lefthook's postinstall will ask the question);
+- the cold-start time of `docker compose up`, for the README.
