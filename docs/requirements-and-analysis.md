@@ -311,7 +311,7 @@ Options are genuinely different approaches, and the company's own stack is alway
 | D-24 | Which tool turns the backend contract into types — and does it decide our compiler version? | FR-3, QR-5, QR-24, QR-25, QR-21, QR-3 | plan 01, before D-22 |
 | D-10 | How do we catch mistakes and keep the code in one shape before anyone reviews it? | FR-2, QR-3, QR-4, QR-7, QR-12, QR-14, QR-21, QR-23, QR-24 | plan 02 |
 | D-25 | When do the checks run, and how do commit messages keep to the convention? (split from D-10) | QR-15, FR-2, QR-23, QR-24 | plan 02 |
-| D-21 | Security tooling and agent guardrails | QR-11, DR-6 | plan 02 |
+| D-21 | What keeps secrets and unsafe code out, and what may the agent touch? | QR-11, DR-6, QR-7, QR-23, QR-24 | plan 02 |
 | D-23 | How do new packages get into the project, and how do we keep them up to date? | QR-24, QR-25, QR-11 | plan 02 |
 | D-16 | Actor zones and rendering strategy per zone | DR-1, DR-4, QR-8 | plan 03 |
 | D-03 | How server data is fetched, cached and validated at the boundary (the generator itself moved to D-24, CC-01) | FR-3, QR-1, QR-5 | plan 04 |
@@ -710,6 +710,92 @@ package as a risk, while git's own mechanism needs a few lines we write and prov
     people (DR-9).
   - *Growth path* — CI runs the same `check` and the same pattern (DR-9); lefthook or commitlint when one
     of the "wrong if" conditions happens.
+
+### D-21 — What keeps secrets and unsafe code out, and what may the agent touch?
+
+`Accepted` 2026-09-10 · needed by plan 02 · build now · judged by QR-11, DR-6, QR-7, QR-23, QR-24
+
+**What we are deciding.** A financial product fails its users the moment a credential leaks. A leak can
+come from the repository, from the code shipped to browsers, or from the machine the code is written
+on. An AI agent working in the repository is one more way in. Most of these leaks have a machine answer:
+- a scanner that refuses a commit carrying a key;
+- a browser policy that runs scripts only from our own server;
+- lint rules that refuse the two coding patterns that expose tokens or run untrusted HTML;
+- an operating-system sandbox around the agent's commands.
+
+The one real choice is the scanner. One option is the long-standing tool whose author has frozen it; the
+other is its successor from the same author, younger but still getting new detectors. The rest of this
+entry states honestly where each control stops.
+
+**Not decided here:**
+- package admission, quarantine and audit (D-23);
+- where the session lives (D-17) — only the lint that forbids storing tokens is decided here;
+- scrubbing telemetry (D-19);
+- server-side gates in CI (D-11).
+
+| Criterion | A — gitleaks 8.30.1 | B — betterleaks 1.8.1 | C — trufflehog 3.97.4 | D — secretlint 13.0.5 |
+|---|---|---|---|---|
+| QR-11 catches a key in history, working tree and staged changes | ✅ all three modes | ✅ all three modes | ❓ not run | ❓ not run |
+| Keys in real formats (Stripe live, Slack bot, a Binance-style secret) | ✅ 3 of 3 | ✅ 3 of 3 | ❓ | ❓ |
+| An AWS key ID alone, without its secret | ✅ flagged | ⚠️ not flagged | ❓ | ❓ |
+| Our own mock data: exchange connections with key fields, transaction hashes, wallet addresses | ⚠️ flags the 4 key fields; ignores hashes and addresses | ⚠️ the same | ❓ | ❓ |
+| QR-24 maintenance | ⚠️ its README: "feature complete … security patches only"; last release 2026-03-21, so no new detectors | ✅ the same maintainers, the original author first (252 commits); release 2026-08-18, commits on the day · ⚠️ the project is 7 months old | ✅ release 2026-09-03 | ⚠️ commits only from the update bot |
+| QR-24 how it arrives | ✅ mise (aqua) with checksums; an official image | ✅ mise (aqua); checksums signed with sigstore; an official image for amd64 and arm64, binary at `/usr/bin/betterleaks` | ⚠️ AGPL-3.0; built to check findings against providers' live APIs (`--results=verified`) | ❌ npm with 8 direct dependencies — the kind of package this project treats as the risk |
+| QR-23 a gate that fails silently | ✅ none seen | ⚠️ exit code 1 means both "found" and "tool error" (issue #347, open); a gate fails closed either way | ❓ | ❓ |
+| Cost of changing later | ✅ the same CLI shape as B (`git`, `dir`, `--staged`) | ✅ one line in `mise.toml` and one in the image | ⚠️ | ⚠️ |
+
+- **Decision:** a baseline of four controls, each proven by a deliberate violation.
+  - *Secrets* — betterleaks 1.8.1, pinned in `mise.toml` for the host and copied by digest from its
+    official image into ours. It runs in the pre-commit hook (`git --pre-commit --staged`) and in `check`.
+    A finding blocks the commit, and triage never widens the allowlist to make it pass.
+  - *The browser* — a Content-Security-Policy on the production form: `default-src 'self'; script-src
+    'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri
+    'none'; frame-ancestors 'none'; form-action 'self'`.
+    - A header test in the Docker gate asserts it, together with plan 01's cache and fallback rules.
+    - A browser-level check (no CSP violations while the app runs) joins the first end-to-end test
+      (D-09).
+  - *Code* — `react/no-danger` and a ban on `localStorage` and `sessionStorage`
+    (`no-restricted-globals` plus `no-restricted-properties`) are lint errors (D-10).
+  - *The agent* — Claude Code's OS sandbox for shell commands.
+    - Reads of `~/.ssh`, `~/.aws` and `.env*` are denied, and the network is limited to the package
+      registry and GitHub.
+    - Docker stays outside the sandbox because it needs its socket, so the narrowed permission rules
+      remain its only guard.
+    - The Playwright MCP server stays outside too, and its unsafe tools remain denied.
+- **Evidence:** measured 2026-09-10 on scratch repositories, with random fake keys.
+  - *Scanner modes* — a clean commit gave exit 0 and a history with a leak gave exit 1 (betterleaks: 2
+    findings, gitleaks: 3). With the key pair staged, both gave exit 1. betterleaks scanned our whole
+    history clean in 347 ms.
+  - *A misreading corrected before this was written* — betterleaks' staged mode first looked blind. It
+    was the AWS key ID alone, which betterleaks does not flag in any mode.
+  - *The built `index.html`* — one module script and one stylesheet, both from `/assets`, and nothing
+    inline, so `'self'` holds for both scripts and styles.
+  - *Lint* — oxlint's `react/no-danger` fired. The storage ban caught 4 of 5 accesses:
+    `const { localStorage } = window` slips through.
+  - *Sandbox* — the Claude Code settings schema has `sandbox.enabled`, `filesystem.denyRead`,
+    `network.allowedDomains`, `credentials.files` and `excludedCommands`. How it behaves is not yet
+    measured; plan 02 proves it by reading a planted file in a denied path.
+  - *GitHub* — the repository is private; whether push protection is on is not visible to us ❓.
+- **Wrong if:**
+  - betterleaks misses a kind of leak that gitleaks catches and that matters here (so far only the lone
+    key ID) — then gitleaks, one line;
+  - the sandbox costs the daily loop (installs, Docker, the index) more than it protects — then keep the
+    narrowed rules and name the gap in `ARCHITECTURE.md`;
+  - the CSP blocks something the app needs (fonts, Sentry) — then a named source joins the policy,
+    together with its test.
+- **Where it leads:**
+  - *Gains* — a credential cannot reach a commit, the agent's included. The bundle runs no script from
+    anywhere but our server. The two code patterns that leak tokens or run untrusted HTML fail lint. The
+    agent's shell cannot read the author's keys even if an injected prompt asks it to.
+  - *Costs* — one Go binary pinned twice (mise and the image); a header test to keep in step with the
+    policy; a known bypass of the storage ban (destructuring), so review still owns it (QR-7); Docker and
+    the MCP servers outside the sandbox.
+  - *For the domain* — the scanner flags mock exchange connections with key fields. The frontend has no
+    use for exchange credentials, so the contract carries a connection's status and never its keys. That
+    is an input to D-03 and D-04, and the scanner then checks the design too.
+  - *Growth path* — CI runs the same scanner on every push, and GitHub's push protection guards the
+    server (D-11). A report-only CSP with an endpoint arrives once monitoring exists (D-19). Nonces are
+    needed if the public zone moves to server rendering (D-16).
 
 ## Course corrections
 
