@@ -13,6 +13,11 @@
     "moduleDetection": "force",
     "noEmit": true,
 
+    /* Strictness — D-22, for the build config too */
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+
     /* Linting */
     "noUnusedLocals": true,
     "noUnusedParameters": true,
