@@ -15,9 +15,10 @@ COPY package.json bun.lock ./
 RUN bun install --frozen-lockfile --ignore-scripts
 
 # Development form: compose bind-mounts the source; node_modules stays in a named volume, never on the host.
+# The volume outlives the image, so every start re-syncs it with the lockfile — a no-op when nothing changed.
 FROM deps AS dev
 EXPOSE 5173
-CMD ["node_modules/.bin/vite", "--host", "0.0.0.0", "--port", "5173", "--strictPort"]
+CMD ["sh", "-c", "bun install --frozen-lockfile --ignore-scripts && exec node_modules/.bin/vite --host 0.0.0.0 --port 5173 --strictPort"]
 
 FROM deps AS build
 COPY . .

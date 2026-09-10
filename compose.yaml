@@ -9,6 +9,7 @@ services:
     volumes:
       - .:/app
       # Keeps the image's Linux node_modules: mixing it with a host install breaks native binaries.
+      # The volume outlives rebuilds, so the dev and check commands re-sync it with bun.lock on start.
       - node_modules:/app/node_modules
 
   web-prod:
@@ -22,7 +23,7 @@ services:
     volumes:
       - .:/app
       - node_modules:/app/node_modules
-    command: ["bun", "run", "check"]
+    command: ["sh", "-c", "bun install --frozen-lockfile --ignore-scripts && exec bun run check"]
 
 volumes:
   node_modules:
