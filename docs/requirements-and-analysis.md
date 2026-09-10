@@ -492,6 +492,41 @@ hook setup (D-10), the React Compiler (D-13).
   - *Costs* — stricter code: every index access and optional field handled precisely; a peer override to own; a slower typecheck than the native compiler; one major behind, which the interview may ask about — the measured answer is the missing JS API.
   - *Growth path* — three exits from 6, in order of cost: (1) a hybrid — the `typescript@6` package stays for tools while the native 7 binary runs the typecheck in `check`, safe because both report identical diagnostics; worth it once the typecheck takes minutes; (2) 6 → 7 outright once the generator ports to the new API; (3) 7 now with a generator that needs no compiler API — the D-24 question, since those generators also bring runtime schemas. Type-aware lint (oxlint-tsgolint already embeds the native compiler) can replace `assertNever` if it proves insufficient.
 
+### D-24 — Which tool turns the backend contract into types — and does it decide our compiler version?
+
+`Accepted` 2026-09-10 · needed by plan 01, before D-22 · build now · judged by FR-3, QR-5, QR-24, QR-25, QR-21, QR-3
+
+**What we are deciding.** Every piece of data the screens show comes from the backend, and its shape is
+described once, in the contract. A generator reads that description and writes the code the frontend
+compiles against, so a change on the backend breaks the build instead of a customer's screen. The
+generator we assumed turned out to be unmaintained (CC-01) and to block the newest compiler, so the
+choice now carries three risks at once: the correctness of every screen, the security of what we
+install, and which compiler we can use. The question is which generator to trust with that — and how
+much of the API layer we let it write for us.
+
+**Not decided here:** how data is cached and validated at the boundary (D-03), where mocks live and how
+they stay out of production (D-04), the compiler version (D-22 — this entry unblocks it).
+
+| Criterion | A — `openapi-typescript` (types only) | B — `orval` (types, query hooks, mock handlers) | C — `@hey-api/openapi-ts` | D — hand-written types |
+|---|---|---|---|---|
+| FR-3 server types from the contract | ✅ | ✅ | ✅ | ❌ hand-written payload types |
+| FR-3 mocks typed from the same contract | ⚠️ via `openapi-msw`, not released since 2025-08 | ✅ MSW handlers and mock data generated | ❓ | ❌ |
+| QR-1 unions and enums in our conventions | ❓ union not tried | ✅ `Deposit \| Trade` discriminated; enums as `as const` objects | ❓ | ⚠️ by discipline |
+| QR-3 generated code passes our strict flags | ❓ not run under them | ✅ with `mock.required: true`; the default leaves `undefined` in two mock fields (TS2375) | ❓ | ✅ |
+| Our transport stays the one exit to the network | ✅ types only | ✅ generated calls go through our function (mutator) | ❓ | ✅ |
+| D-22 compiler version left free | ❌ crashes on 7 | ✅ generated and typechecked on 7.0.2 | ❓ spike declined | ✅ |
+| QR-24, QR-25 maintained and safe to install | ❌ stalled (CC-01); audit clean | ✅ five human merges on 9–10 Sep, one a security fix · ⚠️ one high advisory via `js-yaml` 4.3.1 → override to ≥ 4.3.2 | ⚠️ active, pre-1.0 | ✅ nothing to install |
+| QR-8 how much it writes and pulls in | ✅ types only | ⚠️ hooks and mock data too; its tree carries `typedoc` with a nested TypeScript 6 | ❓ | ✅ nothing |
+| Cost of changing later | ✅ types only, easy to swap | ⚠️ generated hooks spread through screens; switching to types-only output is one config key | ❓ | ❌ every type by hand |
+
+- **Decision:** `orval` 8.30.0 generates the types, the TanStack Query hooks through our own transport, and the MSW handlers with mock data — all from one contract, with `mock.required: true` and a `js-yaml` override to ≥ 4.3.2 until `orval` ships one.
+- **Evidence:** spike, 2026-09-10, on a contract with a `Deposit | Trade` union and a query-parameter enum — generation on TypeScript 7.0.2 exit 0; hooks import our transport; `api.msw.ts` and `api.faker.ts` generated; typecheck under all our strict flags exit 0 after `mock.required: true`; `npm audit` — `js-yaml` 4.3.1 affected (< 4.3.2), npm's own "fix" is a downgrade to orval 7. Registry: MIT, Node ≥ 22.18; `openapi-msw` last release 2025-08.
+- **Wrong if:** the generated hooks fight the cache and query-key conventions D-03 and D-06 settle on — then `orval` emits types and mocks only, and hooks stay hand-written; or its advisories keep recurring faster than it fixes them; or `openapi-typescript` revives with TypeScript 7 support and types-only minimalism wins back.
+- **Where it leads:**
+  - *Gains* — one contract drives types, calls and mocks, so a backend change breaks the build in all three places at once; D-22 can take the native compiler; the generator is actively maintained.
+  - *Costs* — more generated code, and a heavier install to audit; an override to own until upstream bumps `js-yaml`; generated hooks shape the API layer, so D-03 has to accept or narrow them.
+  - *Growth path* — a second backend (DR-5) is a second `orval` target with its own contract; the Zod output `orval` also offers is the candidate for runtime validation at the boundary (D-03).
+
 ## Course corrections
 
 When evidence overturns an assumption — even one never written down — the earlier reasoning stays and
