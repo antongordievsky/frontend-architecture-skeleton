@@ -309,7 +309,8 @@ Options are genuinely different approaches, and the company's own stack is alway
 | D-22 | How strict should the compiler be, and which version of it do we build on? | QR-1, QR-3, QR-5, QR-13, QR-21 | plan 01 |
 | D-13 | Do we let a compiler optimise rendering for us, and which one do we trust? | QR-4, QR-2, QR-9, QR-21, QR-24 | plan 01 |
 | D-24 | Which tool turns the backend contract into types — and does it decide our compiler version? | FR-3, QR-5, QR-24, QR-25, QR-21, QR-3 | plan 01, before D-22 |
-| D-10 | Lint, format, hooks, commit conventions | FR-2, QR-7, QR-14, QR-15 | plan 02 |
+| D-10 | How do we catch mistakes and keep the code in one shape before anyone reviews it? | FR-2, QR-3, QR-4, QR-7, QR-12, QR-14, QR-21, QR-23, QR-24 | plan 02 |
+| D-25 | When do the checks run, and how do commit messages keep to the convention? (split from D-10) | QR-15, FR-2, QR-23, QR-24 | plan 02 |
 | D-21 | Security tooling and agent guardrails | QR-11, DR-6 | plan 02 |
 | D-23 | How do new packages get into the project, and how do we keep them up to date? | QR-24, QR-25, QR-11 | plan 02 |
 | D-16 | Actor zones and rendering strategy per zone | DR-1, DR-4, QR-8 | plan 03 |
@@ -572,6 +573,82 @@ read-only (D-03).
   - *Gains* — memoisation without noise on the table-heavy screens; the compiler's limits become build errors, not silent slowness; money literals stay in the domain, where QR-2 wants them.
   - *Costs* — Babel back in the build and three packages to audit; a coding rule (no BigInt literals in components) enforced by the build rather than by lint; read-only props to declare, while generated models are mutable — D-03 decides where they become read-only.
   - *Growth path* — the native port once it is stable; D-20's performance tests measure whether the compiler earns its place on real screens.
+
+### D-10 — How do we catch mistakes and keep the code in one shape before anyone reviews it?
+
+`Accepted` 2026-09-10 · needed by plan 02 · build now · judged by FR-2, QR-3, QR-4, QR-7, QR-12, QR-14, QR-21, QR-23, QR-24
+
+**What we are deciding.** Most of what the requirements promise is real only if a machine refuses the
+violation before a person reads the code:
+- no loose types around money;
+- React written the way its optimising compiler expects;
+- accessible screens;
+- parts of the app that cannot reach into each other.
+
+That machine is a linter. A formatter comes with it, so that reviews discuss meaning, not whitespace. The
+candidates differ in how many of our rules they can express and whether they work with the compiler
+version already chosen. The tension: the richest rule catalogue belongs to the oldest tool, and it does
+not support our compiler. The newer tools are the company's own and fast, but some rules have to be written by
+hand. This is decided now because every later plan adds rules to whatever is chosen here.
+
+**Not decided here:**
+- when the checks run, and commit messages (D-25);
+- which boundaries exist (D-16, plan 03) — here, only whether the tool can express them;
+- secret scanning (D-21);
+- type-aware lint rules — added when a rule has a consumer.
+
+| Criterion | A — oxlint + Biome as formatter only (the company's pair) | B — oxlint + oxfmt (one toolchain) | C — Biome for lint and format | D — ESLint + `typescript-eslint` + plugins + Prettier |
+|---|---|---|---|---|
+| FR-2 a boundary rule sees type imports and type re-exports | ✅ `no-restricted-imports` caught an import, a type import and a type re-export; "own module vs another module" needs a local JS plugin, which caught all three with no install | ✅ as A | ✅ `noRestrictedImports` with `**` patterns caught all three; "own module vs another module" would need a GritQL plugin ❓ not run | ⚠️ `eslint-plugin-boundaries` 7.2.0 is the mature answer, but see D-22 |
+| QR-3 `any`, `!`, `type` over `interface` | ✅ all three fired | ✅ as A | ✅ all three fired | ✅ |
+| QR-4 Rules of React, the compiler's rules | ✅ `rules-of-hooks`, `exhaustive-deps`, `purity`, `refs`, `set-state-in-render`, `set-state-in-effect` fired · ❌ prop mutation missed (D-13: `readonly` catches it) | ✅ as A | ⚠️ `useHookAtTopLevel` and `useExhaustiveDependencies` fired; nothing for purity, refs or setting state during render — `useReactCompiler` (nursery) found nothing on the same file · ❌ prop mutation missed | ✅ `eslint-plugin-react-hooks` 7.1.1 ships the compiler's own rules |
+| QR-12 accessibility rules as errors | ✅ `alt-text`, `anchor-is-valid`, `click-events-have-key-events`, `no-static-element-interactions` fired, when listed by name | ✅ as A | ✅ `useAltText`, `useValidAnchor`, `useKeyWithClickEvents`, `noStaticElementInteractions` fired | ✅ `eslint-plugin-jsx-a11y` 6.10.2 |
+| QR-14 formatting gate | ✅ Biome 2.5.12 (published since 2023): `biome ci` failed on an unformatted file (exit 1) and passed once it was formatted; it would reformat 5 of our 7 files, mostly adding semicolons | ⚠️ oxfmt 0.67.0: pre-1.0, first published 2025-09-10; not run | ✅ as A | ✅ Prettier 3.9.6; not run |
+| Formatter and linter agree | ✅ oxlint clean on Biome's output; `biome ci` clean after `oxlint --fix` | ❓ not run | ✅ one tool | ❓ not run |
+| D-22 works on TypeScript 7.0.2 | ✅ needs no compiler API | ✅ | ✅ | ❌ `typescript-eslint` 8.70.0 requires `typescript <6.1.0` — a second compiler just for lint |
+| QR-23 a rule that silently checks nothing | ⚠️ two traps measured: `../*` misses nested paths (`../**` or a regex works); a category does not switch on the accessibility rules | ⚠️ as A | ✅ every rule configured by name fired; the `../*` trap not probed | ✅ long-settled semantics |
+| QR-24 what it adds to install and audit | ⚠️ Biome: a 0.8 MB wrapper plus one platform binary, no install script, SLSA provenance; oxlint is already installed | ⚠️ oxfmt, 8.9 MB | ✅ one package | ❌ ESLint, a parser, three or four plugins, Prettier |
+| QR-21 the company's stack | ✅ exactly theirs | ⚠️ their linter, not their formatter | ⚠️ their formatter, not their linter | ❌ neither |
+| Cost of changing later | ✅ the formatter swaps in one reformat commit; oxlint uses ESLint rule names, so D stays reachable | ✅ as A | ⚠️ its rule names and semantics differ from the ESLint family | ⚠️ several packages to move off together |
+
+- **Decision:** oxlint for lint and Biome for formatting only — the company's own pair, pinned exactly.
+  - Every rule is enabled by name, never through a category, and is proven by a deliberate violation
+    before it is kept.
+  - The plan 03 boundary rules use the built-in `no-restricted-imports` where a path pattern is enough.
+    Where a rule must know which module a file belongs to, they use a small local JS plugin.
+- **Evidence:** measured 2026-09-10.
+  - *Registry:* oxlint 1.82.0 (installed; the template's range is `^1.81.0`), `@biomejs/biome` 2.5.13,
+    oxfmt 0.67.0, Prettier 3.9.6, ESLint 10.10.0, `eslint-plugin-react-hooks` 7.1.1,
+    `eslint-plugin-boundaries` 7.2.0, `oxlint-tsgolint` 7.0.2001. `typescript-eslint` 8.70.0 declares the
+    peer `typescript >=4.8.4 <6.1.0`.
+  - *oxlint 1.82.0, in a scratch project:*
+    - the rules above fired on deliberate violations;
+    - `no-restricted-imports` with `../*` stayed silent, while `../**` and a regex caught all three
+      violations;
+    - with the accessibility plugin on and whole categories set to error, not one of its rules fired,
+      while listing four of them by name fired all four;
+    - a local JS plugin with no dependencies caught the same three cross-page imports and left the
+      page's own import alone. oxlint's schema says: "JS plugins are in alpha and not subject to semver".
+  - *Biome, registry:* 5 maintainers, no install script, SLSA provenance, a release every week, human
+    commits on the day, 25.7 k stars.
+  - *Biome, spike:* version 2.5.12 — 2.5.13 was published the same day, younger than any quarantine D-23
+    may set. It was installed, with the author's approval, into a scratch copy of the repository, never
+    into the repository. Its formatting gate and its lint rules ran on the same code and the same
+    violations as oxlint; the results are in the table.
+- **Wrong if:**
+  - a boundary plan 03 needs cannot be expressed as a JS plugin, or JS plugins break between oxlint
+    releases — then `eslint-plugin-boundaries` loaded through the same JS plugin host, or ESLint for
+    boundaries alone once `typescript-eslint` supports TypeScript 7;
+  - Biome's output and oxlint's autofixes keep undoing each other — not seen yet.
+- **Where it leads:**
+  - *Gains* — the company's exact pair. One linter covers types, hooks, the compiler's rules and
+    accessibility, and a boundary rule that sees type-only imports.
+  - *Costs* — two config files; rules listed one by one; a small hand-written plugin on an alpha API,
+    guarded by its own proof; prop mutation stays the type checker's job (D-13).
+  - *Growth path* — type-aware rules through `oxlint-tsgolint`, which is built on the TypeScript 7
+    compiler, when a rule earns its place — for example, exhaustive `switch` over transaction kinds
+    (QR-1). oxfmt, if it reaches 1.0 and the company moves to it. If the local plugin outgrows itself,
+    `eslint-plugin-boundaries` runs in the same JS plugin host.
 
 ## Course corrections
 
