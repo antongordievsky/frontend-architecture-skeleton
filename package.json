@@ -12,7 +12,8 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "typecheck": "tsc -b",
-    "check": "bun run typecheck && vite build --outDir node_modules/.cache/check-build && bun audit",
+    "check": "biome ci && bun run typecheck && vite build --outDir node_modules/.cache/check-build && bun audit",
+    "format": "biome format --write",
     "lint": "oxlint",
     "preview": "vite preview",
     "graph:build": "codegraph build --no-incremental",
@@ -37,5 +38,7 @@
     "typescript": "7.0.2",
     "vite": "8.3.0"
   },
-  "trustedDependencies": ["!none"]
+  "trustedDependencies": [
+    "!none"
+  ]
 }
