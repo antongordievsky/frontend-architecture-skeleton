@@ -313,6 +313,7 @@ Options are genuinely different approaches, and the company's own stack is alway
 | D-25 | When do the checks run, and how do commit messages keep to the convention? (split from D-10) | QR-15, FR-2, QR-23, QR-24 | plan 02 |
 | D-21 | What keeps secrets and unsafe code out, and what may the agent touch? | QR-11, DR-6, QR-7, QR-23, QR-24 | plan 02 |
 | D-23 | How do new packages get into the project, and how do we keep them up to date? | QR-24, QR-25, QR-11 | plan 02 |
+| D-26 | When the agent starts a container, how much of the machine can that container reach? | DR-6, QR-11, QR-7, QR-8, C-2, FR-6 | deferred by the author — not what the take-home is about |
 | D-16 | Actor zones and rendering strategy per zone | DR-1, DR-4, QR-8 | plan 03 |
 | D-03 | How server data is fetched, cached and validated at the boundary (the generator itself moved to D-24, CC-01) | FR-3, QR-1, QR-5 | plan 04 |
 | D-08 | Representation of amounts and assets | QR-1, QR-2 | plan 04 |
@@ -761,6 +762,9 @@ entry states honestly where each control stops.
       registry and GitHub.
     - Docker stays outside the sandbox because it needs its socket, so the narrowed permission rules
       remain its only guard.
+      - *Corrected 2026-09-10 in plan 02 (CC-03):* those rules pre-approve the agent's docker commands,
+        so they guarded nothing. The sandbox now refuses writes to the files that configure docker; the
+        container itself is D-26.
     - The Playwright MCP server stays outside too, and its unsafe tools remain denied.
 - **Evidence:** measured 2026-09-10 on scratch repositories, with random fake keys.
   - *Scanner modes* — a clean commit gave exit 0 and a history with a leak gave exit 1 (betterleaks: 2
@@ -886,6 +890,45 @@ how much the package manager already enforces, what we add to it, and what stays
     re-checks every lockfile change. OSV-Scanner earns its place when a second ecosystem arrives, for
     example a Python AI service (DR-5). Provenance checks arrive when Bun supports them.
 
+### D-26 — When the agent starts a container, how much of the machine can that container reach?
+
+`Open` — deferred by the author 2026-09-10: not what this take-home is about · design for · judged by
+DR-6, QR-11, QR-7, QR-8, C-2, FR-6
+
+**What we are deciding.** The agent's own commands are boxed in. They cannot read the author's keys or
+the project's secrets, and they reach only a short list of sites. The containers the agent starts are
+not boxed in. A container runs the project's code, which the agent can change. It also has write access
+to the project and an open network. One option removes that power by construction, which is thorough
+but constrains every tool that writes into the project. The other asks the author before each start,
+which is cheap but rests on attention. The question matters only against an agent steered by text it has
+read (prompt injection). A compromised package already runs with the author's own rights whenever the
+author runs the project, and D-23 is the guard there.
+
+**Not decided here:**
+- package admission (D-23);
+- the sandbox itself, and the routes already closed (D-21, CC-03);
+- browsers in Docker (D-09).
+
+| Criterion | A — the project read-only in containers | B — every container start asks the author | C — name the gap only | D — B, plus `.claude` and `.git` read-only in containers |
+|---|---|---|---|---|
+| DR-6 writes to the host (a compose override, `.claude`, `.git/config`) | ✅ closed by construction | ⚠️ a person before each start; the prompt shows the command, not the files changed before it | ❌ open, no prompt | ✅ the two control folders closed by construction · ⚠️ the rest by the prompt |
+| DR-6 the container reads `.env` and has an open network | ❌ still open: read-only does not stop reading | ⚠️ by the prompt | ❌ | ⚠️ by the prompt |
+| C-2 a fresh clone | ⚠️ needs a tracked `node_modules/` placeholder, without which the container does not start (measured) | ✅ | ✅ | ❓ both folders exist in every clone; not measured |
+| FR-6 `check` in Docker | ❌ `bun audit` opens `package.json` for writing and fails (measured) | ✅ | ✅ | ❓ not measured |
+| QR-8 pragmatism | ⚠️ a special layout for a threat that exists only in the agent's session | ✅ one settings change | ✅ | ✅ |
+| Cost today | ~30 min, plus unknowns (Vite's dev server not measured) | ~5 min | ~5 min | ~10 min with the proof |
+| Cost of changing later | ❌ every tool that writes into the tree must be redirected — Playwright's `test-results/` first (D-09) | ✅ one line; 2–5 prompts per plan; the hooks are unaffected | ❌ a sandbox with a known silent bypass | as B |
+
+- **Evidence:** measured 2026-09-10 at plan 02's wrap-up, in a fresh clone of `build/02-gates` with the
+  project mounted `.:/app:ro`:
+  - without a `node_modules` directory in the clone, the container did not start: `make mountpoint
+    "/app/node_modules": ... read-only file system`;
+  - with one, format, lint, typecheck, build and the secrets scan passed, and `bun audit` failed with
+    `EROFS: Read-only file system: could not open "/app/package.json"`.
+- **Where it leads:** until this is decided, `CLAUDE.md` and `ARCHITECTURE.md` name the gap: the agent's
+  docker commands are pre-approved, and a container they start is outside the sandbox. It is revisited
+  when D-09 puts browsers into Compose, because the mount layout is reopened there anyway.
+
 ## Course corrections
 
 When evidence overturns an assumption — even one never written down — the earlier reasoning stays and
@@ -913,6 +956,23 @@ the correction is recorded here, dated, with what triggered it. This is the chai
   versions, not a re-check of the lockfile. The CI growth path starts from a fresh cache.
 - **Lesson:** a control is trusted only once it has been seen holding in the state it will actually run
   in — here, a warm cache on a developer's machine — not only in a clean spike.
+
+### CC-03 — Docker outside the sandbox was assumed to be guarded by the permission rules · 2026-09-10
+
+- **Assumed:** D-21 kept Docker outside the sandbox "so the narrowed permission rules remain its only
+  guard", and `CLAUDE.md` said the same.
+- **Found:** at plan 02's security review. The rules pre-approve the agent's `docker compose build`, `up`
+  and `run --rm check`, so nothing guarded them. Anything that decides what docker does was therefore a
+  way out of the sandbox, with no prompt:
+  - compose merges `compose.override.yaml` on its own, and `COMPOSE_FILE` in `.env` swaps the compose
+    file (both measured in a scratch project). Either can add a host mount such as `~/.ssh`;
+  - `~/.docker/cli-plugins/docker-compose` is a symlink, and `~/.docker` was writable from the sandbox;
+  - a container runs project code with write access to the tree (including `.claude/settings.json` and
+    `.git/config`) and an open network.
+- **Changed:** the sandbox now refuses writes to the compose files, `.env` and `~/.docker` (`6f0aead`,
+  each proven with EPERM). The container route became D-26, left open and deferred by the author.
+- **Lesson:** an exclusion from a sandbox is only as narrow as everything the excluded program reads.
+  List those inputs before trusting the exclusion.
 
 ---
 

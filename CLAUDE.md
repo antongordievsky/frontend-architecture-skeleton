@@ -16,12 +16,25 @@ Everything runs in Docker (C-2). Host commands use the runtimes pinned in `mise.
 | Production form via Caddy — http://localhost:8080 | `docker compose --profile prod up` |
 | Full check, in Docker | `docker compose run --rm check` |
 | Full check, on the host | `mise exec -- bun run check` |
-| Typecheck only | `mise exec -- bun run typecheck` |
+| Format the tree | `mise exec -- bun run format` |
+| Lint · typecheck only | `mise exec -- bun run lint` · `mise exec -- bun run typecheck` |
+| Production headers and cache rules (with `web-prod` running) | `sh scripts/check-headers.sh` |
 | Refresh the code index | `mise exec -- bun run graph:update` (`graph:build` rebuilds from scratch) |
 
 - `WEB_PORT` and `PROD_PORT` override 5173 and 8080 when they are taken.
-- `check` grows with each plan: today typecheck and build; lint and format arrive in plan 02, tests in
-  plan 04.
+- `check` = format → lint → typecheck → build → secrets → audit; tests join in plan 04.
+- Hooks (`.githooks/`, switched on once by `bun install` through `prepare`). Each refuses to run while
+  the working tree differs from what it checks; set unrelated changes aside with
+  `git stash push --include-untracked -- <paths>`.
+  - pre-commit — the staged secrets scan and the full `check`, plus the Docker gate when dependencies
+    or the image change;
+  - commit-msg — the Conventional Commits header, at most 100 characters;
+  - pre-push — `check` in Docker and the header test on the production form, on its own compose project
+    and port (`PRE_PUSH_PORT`, default 18080).
+- Adding a package (D-23): verify it first (Security below), then `mise exec -- bun add <name>`. It
+  asks the author, saves an exact version, and refuses versions younger than 7 days.
+- Updating (QR-25): one batch at the start of a plan — `bun outdated`, then `bun update <names>`,
+  majors one at a time with the changelog read; one commit per batch, through `check`.
 - The agent's shell is non-interactive and has no mise hook — on its own it picks nvm's Node — so the
   agent runs every project command through `mise exec --`. Package changes ask the author either way.
 
@@ -84,8 +97,8 @@ Requirements (Part I) are written once and change only with the author's agreeme
 ## Git — trunk-based, local-first
 
 - One short branch per plan (`<type>/<slug>`), fast-forwarded into local `main` right after its wrap-up.
-  No pull requests and no CI for this take-home: the local `check` is the gate, and a pre-push hook runs
-  the full `check` as a backstop. CI/CD is a deferred decision (DR-9).
+  No pull requests and no CI for this take-home. The local `check` is the gate. Pre-commit runs it on
+  every commit, and pre-push runs it again in Docker as a backstop. CI/CD is a deferred decision (DR-9).
 - Commits stay local until the author has reviewed them; one push at the end, on the author's go.
 - Conventional Commits: `type(scope): imperative subject`; body = what changed, why, how verified,
   requirement/decision IDs. One concern per commit.
@@ -142,4 +155,14 @@ Requirements (Part I) are written once and change only with the author's agreeme
 - Built-in skills over custom agents: `/code-review` and `/security-review` at wrap-up.
 - `/staff` (`.claude/commands/staff.md`) — decisions (`direction`) and plan reviews.
 - `.claude/settings.json` pre-approves safe commands and denies destructive ones and secret reads.
+- The agent's shell runs in Claude Code's OS sandbox (same file):
+  - it cannot read `~/.ssh`, `~/.aws` or `.env*`, whatever program it uses;
+  - it cannot reach the Docker socket, or write the compose files, `.env` or `~/.docker`, which decide
+    what docker does;
+  - its network is limited to the registry, GitHub, ghcr.io and localhost.
+
+  `docker` runs outside the sandbox, and the agent's `docker compose` commands are pre-approved. A
+  container they start runs project code with write access to the tree and an open network. That gap
+  is named, not closed: D-26, deferred. A commit that changes dependencies runs the Docker gate, so it is
+  committed outside the sandbox, with the author's approval.
 - Everything else in the AI layer is decided in D-15 and exists only with a consumer (QR-18).
