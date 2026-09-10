@@ -2,8 +2,13 @@
 # Node runs the tools (Vite, TypeScript), because that is the runtime they document support for.
 FROM oven/bun:1.4.2-slim AS bun
 
+# D-21: the secrets scanner `check` runs, pinned by digest (the multi-arch index of v1.8.1); the host pins
+# the same version in mise.toml.
+FROM ghcr.io/betterleaks/betterleaks@sha256:8b9d12db5e11ca798029da44923503de5d8cfff6992cffaaa6722fbeb9fc7797 AS betterleaks
+
 FROM node:24.21.0-slim AS base
 COPY --from=bun /usr/local/bin/bun /usr/local/bin/bun
+COPY --from=betterleaks /usr/bin/betterleaks /usr/local/bin/betterleaks
 WORKDIR /app
 
 # Dependencies come from the lockfile only: a package.json that disagrees with bun.lock fails here (QR-13).
