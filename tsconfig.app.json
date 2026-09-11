@@ -29,5 +29,6 @@
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src"]
+  /* D-14: the story gallery renders the app's parts, so it compiles as app code */
+  "include": ["src", "playwright/gallery"]
 }

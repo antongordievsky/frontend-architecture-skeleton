@@ -9,8 +9,11 @@ if ! git diff --quiet HEAD || [ -n "$(git ls-files --others --exclude-standard)"
   exit 1
 fi
 
-docker compose build check web
+docker compose build check web browser
 docker compose run --rm check
+# D-14, D-09: the parts' component tests and screenshots, in three engines. Pre-commit does not run them:
+# check's image has no browsers.
+docker compose run --rm browser
 
 # D-21: the production form's headers and cache rules, asserted on the built bundle behind Caddy. The
 # hook uses its own compose project and port, so a web-prod the developer is running is left alone.

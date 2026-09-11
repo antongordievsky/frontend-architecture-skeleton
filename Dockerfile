@@ -29,6 +29,14 @@ FROM deps AS build
 COPY . .
 RUN bun run build
 
+# D-14, D-09: component tests and screenshots in Chromium, WebKit and Firefox, on Microsoft's image, pinned by
+# digest to the version of @playwright/test in package.json; the two move together. Our Node and Bun go first
+# on PATH, so the dev server the tests drive runs on the pinned runtime, not the image's own (QR-13).
+FROM mcr.microsoft.com/playwright:v1.62.1-noble@sha256:dcc5531e97840b9b5e794f2814476b21571c5124a3fca2267d73041f56e7580e AS browser
+COPY --from=base /usr/local/bin/node /usr/local/bin/node
+COPY --from=bun /usr/local/bin/bun /usr/local/bin/bun
+WORKDIR /app
+
 # Production form: the built bundle behind a real web server — what every browser test runs against (D-12).
 FROM caddy:2.11.4-alpine AS prod
 COPY Caddyfile /etc/caddy/Caddyfile

@@ -26,6 +26,10 @@ dist-ssr
 # The code index is derived from the tree and rebuilt on demand (QR-19).
 .codegraph/
 
+# Playwright's run output (D-14). The baselines, in __screenshots__ beside each part, are committed.
+test-results/
+playwright-report/
+
 # The route generator's scratch files (D-05). The route tree itself is committed.
 .tanstack/
 
