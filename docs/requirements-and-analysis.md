@@ -109,8 +109,8 @@ Every requirement sits in one tier:
 
 | ID | Requirement | Why | Acceptance criteria |
 |---|---|---|---|
-| QR-9 | **Performance budgets with regression tests, runnable on a slow machine** | the product is table-heavy; a regression on a 10 000-row screen is a product bug | a production bundle-size budget fails `check`; a browser perf test opens the transactions page on the QR-6 dataset under CPU and network throttling and asserts interaction budgets (numbers measured and fixed in D-20); the same throttled run is one command locally |
-| QR-10 | **Observability and metrics through one seam** | S2 lists Sentry; a render failure nobody sees is a failure twice | one reporter module receives render errors, unhandled rejections, failed requests and Web Vitals (LCP, INP, CLS); in development it logs, and swapping the destination is a one-file change; financial data and PII are scrubbed at the seam — covered by a unit test |
+| QR-9 | **Performance budgets with regression tests, runnable on a slow machine** | the product is table-heavy; a regression on a 10 000-row screen is a product bug | a production bundle-size budget fails `check`; a browser perf test opens the transactions page on the QR-6 dataset under CPU and network throttling and asserts interaction budgets (numbers measured and fixed in D-20); the same throttled run is one command locally. *Scoped 2026-09-11, agreed by the author:* the bundle-size budget is built; the throttled browser perf test and its interaction budgets are skipped on purpose, for time, and `ARCHITECTURE.md` § Skipped says where they land |
+| QR-10 | **Observability and metrics through one seam** | S2 lists Sentry; a render failure nobody sees is a failure twice | one reporter module receives render errors, unhandled rejections, failed requests and Web Vitals (LCP, INP, CLS); in development it logs, and swapping the destination is a one-file change; financial data and PII are scrubbed at the seam — covered by a unit test. *Scoped 2026-09-11, agreed by the author:* the seam is built — the reporter module, with render errors, unhandled rejections and failed requests, logging in development, and the scrubbing test; Web Vitals are skipped on purpose, for time, and `ARCHITECTURE.md` § Skipped says where they land |
 
 ### 5.5 Security
 
@@ -1732,5 +1732,16 @@ taken from the bottom and recorded in `ARCHITECTURE.md` § Skipped.
 | 05 | Routing: shell, routes, typed params, permission guard seam |
 | 06 | UI foundation: tokens, primitives, a11y defaults |
 | 07 | Transactions page: table over 10 000 rows, four states, tests across the trophy |
-| 08 | Observability seam and performance budgets (stretch) |
+| 08 | Observability seam and a bundle-size budget (stretch). Partial by the author's decision, 2026-09-11: the throttled perf test and Web Vitals are skipped on purpose (QR-9, QR-10), for `ARCHITECTURE.md` § Skipped |
 | 09 | `ARCHITECTURE.md` assembled from Part II conclusions (Decision, Where it leads) and the course corrections, README, AI-layer paragraph, final review |
+
+**Skipped so far, on purpose** — the source of `ARCHITECTURE.md` § Skipped, kept as cuts happen:
+
+| What | Why | Where it is recorded | What would bring it back |
+|---|---|---|---|
+| A try-out of the schema check in the transport (`includeZodSchemaInArguments`) | time; D-03 keeps the check in the adapter | plan 04's log, cut 1 | D-03's growth path |
+| Mutation testing in plan 04 | Stryker 10.0.0 pulls `qs` 6.15.1, with three moderate advisories, so `bun audit` fails | plan 04's log, cut 2 | plan 07, on a Stryker release with the fixed client (the author's choice; stryker-js #6177, open since 2026-08-20) |
+| The throttled browser perf test and its interaction budgets | time, by the author's decision, 2026-09-11 | QR-9, plan 08's row | D-20's growth path |
+| Web Vitals through the reporter | time, by the author's decision, 2026-09-11 | QR-10, plan 08's row | D-19's growth path |
+| How far a container the agent starts can reach | deferred by the author: not what the take-home is about | D-26 | D-26 |
+| How many digits a screen shows per currency | deferred by the author: a domain question that needs research | D-27, CC-06 | D-27 |
