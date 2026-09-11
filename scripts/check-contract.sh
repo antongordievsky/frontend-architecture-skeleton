@@ -1,18 +1,22 @@
 #!/bin/sh
-# QR-5: the committed client must be exactly what the contract generates. Regenerate in place, compare
-# with what was there, and always put the original back, so `check` never changes the tree.
+# QR-5: the committed client must be exactly what the contract generates. orval regenerates into a scratch
+# copy of its inputs, never in place: orval's `clean` empties the folder first, and an interrupted check,
+# or a dev server watching src/, must never see the committed client disappear.
 set -eu
 
-backup=node_modules/.cache/contract-check
-rm -rf "$backup"
-mkdir -p "$backup"
-cp -R src/api/generated "$backup/generated"
-trap 'rm -rf src/api/generated && cp -R "$backup/generated" src/api/generated' EXIT
+scratch=node_modules/.cache/contract-check
+rm -rf "$scratch"
+mkdir -p "$scratch/src/api"
+# Everything orval reads: its config, the contract, the mutator it imports, and package.json, from which it
+# picks version-specific output. Under node_modules/, the config still resolves `orval` from the root.
+cp orval.config.ts package.json "$scratch/"
+cp -R contract "$scratch/contract"
+cp src/api/transport.ts "$scratch/src/api/transport.ts"
 
-orval --config orval.config.ts --quiet
+(cd "$scratch" && orval --config orval.config.ts --quiet)
 
-if ! diff -r "$backup/generated" src/api/generated >"$backup/diff.txt"; then
-  cat "$backup/diff.txt" >&2
+if ! diff -r src/api/generated "$scratch/src/api/generated" >"$scratch/diff.txt"; then
+  cat "$scratch/diff.txt" >&2
   echo "contract: src/api/generated is not what contract/openapi.yaml generates — run \`bun run generate\`" >&2
   exit 1
 fi
