@@ -50,7 +50,8 @@ const locate = (file, src, zones) => {
     }
     return { layer: 'zone', zone: top, parts }
   }
-  if (parts.length === 1) return { layer: 'shell', parts }
+  // D-05: route files are the shell's. They are thin, and reach a zone only through its index.ts.
+  if (parts.length === 1 || top === 'routes') return { layer: 'shell', parts }
   if ((top === 'ui' || top === 'components') && parts[1]) {
     return { layer: top, module: parts.slice(0, 2).join('/'), rest: parts.slice(2), parts }
   }

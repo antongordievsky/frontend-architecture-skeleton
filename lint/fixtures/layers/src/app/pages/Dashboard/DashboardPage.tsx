@@ -6,5 +6,7 @@ import Legacy = require('../Transactions/TransactionsPage')
 
 // expect: app/pages/Dashboard imports app/pages/Transactions: pages never import one another
 export type TransactionsShape = import('@/app/pages/Transactions').TransactionsPageProps
+// expect: zone may not import shell
+import { Route } from '@/routes/transactions'
 export type DashboardProps = { compact: boolean }
-export const DashboardPage = [Card, TransactionsTable, Legacy]
+export const DashboardPage = [Card, TransactionsTable, Legacy, Route]
