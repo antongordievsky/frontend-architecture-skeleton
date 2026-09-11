@@ -1971,6 +1971,22 @@ the correction is recorded here, dated, with what triggered it. This is the chai
 - **Lesson:** a barrel is a boundary for people and for lint, but to a bundler it is one module that
   imports everything. Measure the chunks, not the config.
 
+### CC-08 — The quarantine was assumed to cover the packages already installed · 2026-09-11
+
+- *Assumed:* once plan 02 added the 7-day quarantine (D-23), every package in the lockfile was older than 7 days.
+- *Found:*
+  - While D-07's spike was being installed in a scratch folder, the quarantine refused the versions the project
+    itself runs: `react` 19.3.0, `react-dom` 19.3.0 and `vite` 8.3.0.
+  - The registry has them published at 2026-09-09 17:21 (`react`), 2026-09-09 17:17 (`react-dom`) and
+    2026-09-10 11:30 (`vite`).
+  - Plan 01's scaffold resolved them on 2026-09-10. Commit 972e04b ("pin every package exactly and quarantine
+    fresh versions", 2026-09-10 19:44) then pinned them without checking their age; `vite` was eight hours old.
+  - The quarantine applies only when a version is resolved. A frozen install never asks.
+- *Changed:* nothing yet. This is recorded, not fixed in passing.
+  - The three versions leave the quarantine by themselves on 2026-09-16 and 2026-09-17.
+  - What would close the gap is a check that fails while any locked version is younger than the quarantine,
+    unless it is named in `minimumReleaseAgeExcludes` with a reason. That is for the author to decide.
+
 ---
 
 # Part III — Delivery
