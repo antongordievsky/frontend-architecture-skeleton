@@ -259,8 +259,8 @@ What they asked for — each became a requirement:
 
 Neither built nor designed for, each for a stated reason (finalised in Part II and `ARCHITECTURE.md`
 § Skipped): a real backend or BFF (the task asks for a mock; the seam is the contract); tax calculation;
-import pipelines (CSV/XLS parsing); charts; i18n; hosting and deployment. Storybook and visual regression
-are open (D-14), not assumed.
+import pipelines (CSV/XLS parsing); charts; i18n; hosting and deployment. Storybook is not built: parts are
+shown and compared through Playwright's stories and gallery (D-14).
 
 ---
 
@@ -325,7 +325,7 @@ Options are genuinely different approaches, and the company's own stack is alway
 | D-18 | Who may open which screen, and how does a new role arrive without a frontend release? (design for) | DR-3, QR-17, DR-4, DR-8, QR-8, QR-24 | plan 05 |
 | D-07 | Which library gives our parts their behaviour, so that everyone can use them — by keyboard, screen reader and touch? | QR-12, FR-5, FR-7, QR-11, QR-24, QR-20, QR-21, QR-8 | plan 06 |
 | D-28 | How do we write the look, so the design can change without rewriting the screens? (split from D-07) | FR-5, QR-7, QR-12, QR-22, QR-11, QR-8, QR-24, QR-21, DR-1, QR-17 | plan 06 |
-| D-14 | Storybook and visual regression | FR-5, QR-8, QR-21 | plan 06 |
+| D-14 | How do we see every part in every state, and notice when a design change breaks one? | FR-5, QR-12, QR-22, QR-23, QR-24, QR-11, QR-8, QR-21, C-2 | plan 06 |
 | D-06 | State placement (server, URL, client) and the table's data model | FR-3, FR-7, QR-6 | plan 07 |
 | D-19 | Observability and metrics | QR-10, DR-7 | plan 08 |
 | D-20 | Performance strategy and budgets | QR-9, QR-6 | plan 08 |
@@ -2082,6 +2082,126 @@ Out:
       misspelled tokens become a real class of bug;
     - a design tool's export that generates the tokens file;
     - D-14 decides the gallery where themes are reviewed.
+
+### D-14 — How do we see every part in every state, and notice when a design change breaks one?
+
+`Accepted` 2026-09-11 · needed by plan 06 · build now · judged by FR-5, QR-12, QR-22, QR-23, QR-24, QR-11, QR-8,
+QR-21, C-2
+
+**What we are deciding.** Screens are built from parts: buttons, fields, tables. Each part has states a page
+rarely shows at once: disabled, focused, in error, in the dark theme. The design will keep changing, and one change
+to a colour or a spacing value reaches every part at once, on every screen. Nobody clicks through all of that by
+hand after each change. We want each part to be seen, and checked, in each of its states, and the whole app then
+checked end to end, with as few tools as possible. The choice is between a separate showcase built for designers
+and product people, which brings its own tooling and a hosted review service, and a small showcase that the tests
+themselves drive. It is decided now because plan 06 builds the first parts, and the pages are made of them.
+
+**Not decided here:**
+- the browser tests of whole pages, and accessibility checks on them (D-09, plan 07);
+- whether component tests run in pre-commit or only in the browser profile (D-09, settled with the first part);
+- the CI that would host a review flow (D-11);
+- performance budgets (D-20).
+
+**Candidates.** Ladle 5.1.1 is out: 453 packages with four install scripts, no release since 2025-11-04, and
+0.23 M downloads a week.
+
+| Criterion | A — Storybook 10.6.0 and Chromatic | B — Storybook 10.6.0, locally | C — Playwright's stories and gallery (1.62+) | D — no gallery: pages only |
+|---|---|---|---|---|
+| D-09 one story is also the component test | ⚠️ Storybook's own story format; tested through Chromatic, or B's runners | ❌ its Vitest addon wants Vitest 3–4 (ours is 5) and `@vitest/browser`, which D-09 refused; its test runner is Jest, which D-09 refused | ✅ the story is what the test mounts; measured in three engines | ⚠️ no component tests: a part is tested only where a page uses it |
+| FR-5, D-28 a token change is caught | ✅ in Chromatic's cloud, not run | ⚠️ a screenshot step on top of its runner | ✅ with zero tolerance, one unit of blue failed every light story in all three engines; Playwright's default tolerance let blue → violet through | ⚠️ only the states a page shows: not disabled, error or dark |
+| People review every state and theme | ✅ the richest: controls, docs, hosted approvals | ✅ controls and docs, locally | ⚠️ the gallery renders any story by id; a list of stories is ours to add | ❌ |
+| C-2, nothing leaves the machine | ❌ a hosted service and CI, which is deferred (DR-9); the rendered UI is uploaded | ✅ | ✅ Microsoft's image D-09 chose: 18 tests in 3.6–4.2 s | ✅ |
+| QR-22 three engines | ❓ not run | ❓ not run | ✅ Chromium, WebKit, Firefox | ✅ plan 07 |
+| QR-24 packages | ⚠️ 208, an `esbuild` install script | ❌ 564 with its test runner, four install scripts | ✅ none new: `@playwright/test` (3 packages) arrives for D-09 anyway | ✅ none |
+| QR-11 record | ⚠️ two high advisories in a year: a built Storybook could carry `.env` values; its dev server's WebSocket could be hijacked (fixed in 10.1.10 and 10.2.10) | ⚠️ as A | ✅ none on record | ✅ |
+| QR-8 cost today | ❌ a second dev server, config and story format; an account | ⚠️ as A, without the account | ✅ a gallery page of a few dozen lines, to Playwright's spec; a story per state | ✅ nothing |
+| Maturity | ✅ | ✅ | ⚠️ the model is seven weeks old; the older component-testing packages stop being updated in 1.63 | ✅ |
+| Cost of changing later | ✅ | ✅ | ⚠️ stories are plain components, so the scenarios carry over, but moving to Storybook wraps each file in its format (not measured) | ⚠️ stories written from nothing |
+| QR-21 the company's stack | ✅ both named | ⚠️ Storybook named, its testing is not | ⚠️ Playwright named, Storybook not | ⚠️ |
+| Adoption, npm downloads in the week to 2026-09-10 | `storybook` 15.82 M, `chromatic` 6.11 M | 15.82 M | `@playwright/test` 45.34 M; the model within it | — |
+
+- **Decision:** Playwright's stories and gallery. Each part gets one story per state, beside it. That one story does
+  three jobs:
+  - it is the part's component test;
+  - it is the part's visual baseline, in every theme;
+  - it is a page in the gallery that people open on the dev server.
+
+  Screenshots are compared with zero tolerance, in three engines, in Microsoft's Playwright image. Pages are then
+  tested end to end on the production build (plan 07).
+  - *The chain the author asked for:* parts, then stories that test each part and fix its look, then pages built from
+    the parts, then the built app end to end. Every link runs in the engines users have, under one tool.
+  - *Why not Storybook, the company's choice:*
+    - its testing path does not fit our tests: its Vitest addon needs Vitest 3–4 and `@vitest/browser`, and its
+      test runner brings Jest (D-09 refused both);
+    - it brings 208–564 packages, and had two high advisories in a year;
+    - its visual review is Chromatic, a hosted service that needs CI (DR-9).
+
+    Its gallery is better for people; that is its growth path.
+  - *Why not pages alone:* the states no page shows — disabled, error, dark — would never be compared, and a token
+    change would slip through them.
+  - *Zero tolerance.* Playwright's default passes a colour change up to about 0.2 in perceived difference, which
+    covers blue → violet. Baselines change only on purpose (`--update-snapshots`), and a reviewer sees them as images
+    in the commit.
+  - *The gallery* lives in `playwright/gallery/` and is served by our dev server, so the React Compiler and CSS Modules
+    run as they do in the app. It is not part of the production build; plan 06 proves that on the build output.
+  - *Playwright's component-testing skill* was read: it is instructions only, and it runs nothing. It is not added to
+    the repository (QR-18). Its gallery spec is followed.
+- **Evidence:** measured 2026-09-11.
+  - *The spike:*
+    - Playwright 1.62.1 ran in `mcr.microsoft.com/playwright:v1.62.1-noble`, with a gallery to Playwright's contract
+      (`window.mount`, `#root`) and three stories: primary, disabled and dark;
+    - `mount` rendered each story; Tab reached the button; an unknown story failed the mount;
+    - with the default tolerance, the accent changed from `#1d4ed8` to `#2563eb` and every screenshot still passed.
+      A probe confirmed the page used the new colour;
+    - with zero tolerance, two runs without a change passed 18 of 18;
+    - with zero tolerance, `#1d4ed9` (one unit) and `#2563eb` each failed all six light stories and none of the dark
+      ones, in all three engines;
+    - nine baselines, 36 kB, named per engine and platform (`button-Primary-webkit-linux.png`).
+  - *Why the default misses it:* pixelmatch's YIQ colour difference, the one Playwright's comparator uses, was computed
+    for these colours. `#1d4ed8` → `#2563eb` needs a tolerance below 0.068 to be caught, and `#1d4ed8` → `#7c3aed`
+    needs one below 0.197.
+  - *Playwright:*
+    - 1.62.0 (2026-07-24) moved component testing to stories and galleries, served by our own dev server, with
+      `mount` built into `@playwright/test`;
+    - 1.63.0 (2026-09-04) stops updating `@playwright/experimental-ct-react`;
+    - its docs: "Browser rendering can vary based on the host OS … run tests in the same environment where the
+      baseline screenshots were generated";
+    - the component-testing skill ships inside `playwright-core`, with the gallery spec.
+  - *Storybook:*
+    - `storybook` 10.6.0: provenance, eight maintainers;
+    - `@storybook/addon-vitest` 10.6.0 and 11.0.0-alpha.0 both peer `vitest ^3 || ^4` and `@vitest/browser`, and
+      issue #36221, "Support Vitest 5", is open since 2026-09-08;
+    - `@storybook/test-runner` 0.24.5 depends on Jest 30;
+    - advisories GHSA-8452-54wp-rmv6 and GHSA-mjf5-7g4m-gx5w.
+  - *Chromatic:* `chromatic` 18.8.1, homepage chromatic.com; `@chromatic-com/playwright` 0.14.12 records Playwright
+    tests for it, and brings 83 packages together with `chromatic`.
+  - *Package counts* were resolved from the registry's metadata, without an install. Downloads come from
+    `api.npmjs.org`, and advisories from GitHub's advisory database.
+- **Wrong if:**
+  - zero tolerance flakes, so that a run without a change fails. Then a small `maxDiffPixels` per story, recorded
+    with its reason;
+  - a CI on another CPU architecture renders differently from this machine's image. Then the baselines come from the
+    CI's image (D-11);
+  - designers or product people need to review states without running the project. Then Storybook and a hosted
+    review, with the stories moved into its format;
+  - Playwright changes the gallery contract in a minor release. Then pin the version and follow its migration.
+- **Where it leads:**
+  - *Gains:*
+    - one story per state gives a test, a visual baseline and a gallery page;
+    - no new package: Playwright arrives for D-09 anyway;
+    - a redesign's token change is caught on every part, in each theme and each engine, before a page is opened;
+    - it all runs in the image that browser tests already use.
+  - *Costs:*
+    - the gallery page is ours to keep;
+    - no controls or docs pages like Storybook's;
+    - baselines are Linux images in the repository, and are compared only inside Docker;
+    - at zero tolerance, any rendering change, such as a new image or font, rewrites every baseline, and the image
+      is pinned for that reason;
+    - the model is young.
+  - *Growth path:*
+    - a list page in the gallery, then typed story ids through the `Stories` registry (1.63);
+    - with CI (D-11), a hosted review of the diffs. Chromatic records Playwright tests without Storybook;
+    - Storybook itself, if the gallery becomes a tool for designers and product people.
 
 ## Course corrections
 
