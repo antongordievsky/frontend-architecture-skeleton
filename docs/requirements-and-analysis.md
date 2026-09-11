@@ -319,10 +319,10 @@ Options are genuinely different approaches, and the company's own stack is alway
 | D-08 | How do we hold money so that no amount is ever silently wrong? (amended: the minor digits travel with the amount, CC-06) | QR-1, QR-2, QR-3, QR-8, QR-9, QR-21, QR-24 | plan 04 |
 | D-27 | How many digits does a screen show for each currency — every digit of the unit (`HUF 1,234.56`), or the local convention (`1235 Ft`)? A domain question, split from D-08 (CC-06) | QR-2, QR-21 | deferred by the author — needs domain research; until then every digit is shown and nothing is rounded (QR-2) |
 | D-04 | Where does the demo data come from, and how do we keep it out of what users download? | FR-3, QR-6, QR-11, C-2, QR-5, QR-8, QR-9, QR-24, QR-21 | plan 04 |
-| D-17 | How do people sign in, and what does the browser keep so that nobody can steal a session? (design for) | DR-2, QR-11, DR-3, DR-8 | plan 04 |
+| D-17 | How do people sign in, and what does the browser keep so that nobody can steal a session? (design for; amended: the reaction to a 401 is built in plan 05) | DR-2, QR-11, DR-3, DR-8 | plan 04 |
 | D-09 | How do we know the product works, and that our tests would notice if it stopped? (amended: mutation testing deferred as future work) | FR-6, QR-12, QR-22, QR-23, QR-4, QR-8, QR-21, QR-24 | plan 04 (first tests) |
 | D-05 | How does each address lead to its screen, and how do we stop links and filters in the address from breaking? | FR-4, QR-3, QR-4, FR-2, QR-17, QR-20, DR-1, DR-3, QR-21, QR-24 | plan 05 |
-| D-18 | Authorization model (design for, guard seam) | DR-3, QR-17 | plan 05 |
+| D-18 | Who may open which screen, and how does a new role arrive without a frontend release? (design for) | DR-3, QR-17, DR-4, DR-8, QR-8, QR-24 | plan 05 |
 | D-07 | UI foundation: kit, styling model, tokens | FR-5, QR-12, QR-21, QR-22 | plan 06 |
 | D-14 | Storybook and visual regression | FR-5, QR-8, QR-21 | plan 06 |
 | D-06 | State placement (server, URL, client) and the table's data model | FR-3, FR-7, QR-6 | plan 07 |
@@ -1396,6 +1396,11 @@ the sign-in providers and the backend's auth stack (the backend's choice); the m
       would send the cookie to any origin a misconfigured base URL pointed to;
     - a 401 is `ApiError { kind: 'http', status: 401 }` and is never retried (D-03's cache policy);
     - nothing else: no session query, guard or sign-in page before a screen needs them (QR-8).
+    - *Amended 2026-09-11 by the author, at D-18's review:* the reaction to a 401 is built in plan 05,
+      not with the first sign-in screen. The shell clears the query cache and sends the user to a sign-in
+      page in the public zone, with the address to return to. The page is a stub whose button navigates to
+      the backend's `/auth/<provider>`. `/me`, sign-out and the CSRF header still arrive with the first
+      real sign-in.
   - *Designed for, with the first sign-in screen:*
     - sign-in is a full-page navigation to the backend's `/auth/<provider>`, from a page in the public
       zone (D-16). No OAuth code runs in the browser;
@@ -1715,6 +1720,114 @@ more generated file to keep. It is decided now because plan 05 builds the shell,
     - D-18's guard becomes a `beforeLoad` on a zone's layout route;
     - the public zone moves to Start with its own entry (D-16);
     - virtual file routes, if the file convention ever fights D-16.
+
+### D-18 — Who may open which screen, and how does a new role arrive without a frontend release?
+
+`Accepted` 2026-09-11 · needed by plan 05 · design for (the error states, the reaction to a 401 and a place for
+the guard are built now) · judged by DR-3, QR-17, DR-4, DR-8, QR-8, QR-24
+
+**What we are deciding.** Taxpayers, support staff and, later, accountants working for several clients see
+different screens and may do different things. The frontend can be bypassed: anyone can call the API
+without it. So the server checks the user's role on every request, and whatever the frontend checks is there
+only so that people are not shown what they cannot use. The question is what the frontend checks, and what
+it shows when the server says no:
+- role names: quick, but every new role, such as "accountant" or "read-only support", needs a frontend
+  release;
+- rights the server lists: the frontend never learns about roles, but the backend must be able to list the
+  rights;
+- the server's full rules, evaluated in the browser: they answer questions about a single record too, but the
+  policy then lives in two places;
+- nothing: every screen asks the server and shows its refusal.
+
+It is decided now because plan 05 builds the route tree and the shell's error screens, and both depend on the
+answer. Nothing else is built before the support zone's first page (D-16).
+
+**Not decided here:**
+- sign-in and the session that carries the rights (D-17);
+- the support zone's screens (DR-4);
+- the backend's authorization library, which is the backend's choice.
+
+| Criterion | A — screens follow the API's answers; a list of permissions in the session adds guards | B — role names checked in the frontend | C — the server's rules evaluated in the browser | D — the API's answers only, no check in the frontend |
+|---|---|---|---|---|
+| The frontend is bypassed: the server checks the role on every request | ✅ the guard is a shortcut; a refused request still shows the server's 403 | ⚠️ a role check in the browser invites trusting it | ⚠️ the browser's copy of the rules can drift from the server's, and a screen believes its own answer | ✅ |
+| DR-3 a new role needs no frontend change | ✅ a role is a bundle on the server | ❌ every role is a release | ✅ | ✅ |
+| DR-3 `Permission` from the contract, one `can()`, one guard | ✅ an enum in the contract, generated as a union | ❌ checks roles, not permissions | ⚠️ rules are data (action, subject, conditions), and their conditions have no contract type | ❌ nothing to type or guard |
+| Rights on one record (an accountant edits one client's transactions, not another's) | ⚠️ a right that depends on the record arrives on the record, computed by the server | ❌ | ✅ conditions per record | ✅ the server refuses |
+| DR-3 delegated access not precluded | ✅ the session's permissions are for the account being acted for | ⚠️ | ✅ | ✅ |
+| One place for the policy | ✅ the server decides; the browser reads a list | ⚠️ which role sees which screen lives in the frontend | ❌ evaluated in two places that must agree | ✅ |
+| No screen the user cannot use | ✅ the guard answers before a request is made | ✅ | ✅ | ⚠️ every link is shown; the refusal comes after a request |
+| the company's Rails backend | ⚠️ with Pundit the backend computes the list, because its policies are methods; with CanCanCan the list follows from its rules · ❓ which one the company uses | ✅ | ⚠️ CanCanCan's rules map onto the browser library; Pundit's methods do not | ✅ |
+| QR-8, QR-24 | ✅ no package: a type, a function, a guard | ✅ | ⚠️ `@casl/ability` 7.0.1, one maintainer | ✅ |
+| DR-8 React Native reuses it | ✅ `can()` is a plain function in `api` | ✅ | ✅ | ✅ |
+
+- **Decision:** the server authorizes every request, and the frontend is assumed bypassed. Screens follow the
+  API's answers, and every failure shows a clear, standard state, the same on every route. On top of that,
+  the frontend checks permissions, never roles:
+  - the session (`/me`, D-17) carries the flat list of permissions the user holds for the account being
+    acted for;
+  - `Permission` is a union generated from the contract;
+  - there is one `can(session, permission)` and one guard, in a layout route's `beforeLoad` (D-05).
+
+  The guard and `can()` only spare the user a request that would be refused. They never stand in for the
+  server.
+  - *Set by the author at review, 2026-09-11:*
+    - the frontend can be bypassed, so it never answers for the server;
+    - the single-page app renders a standard set of states from the API's answers, with errors a user
+      understands;
+    - it sends the user to sign in when the session has ended.
+  - *Built now, in plan 05:*
+    - the shell turns the typed `ApiError` (D-03) into standard states. Each says what happened and what to
+      do next: 403 is no access, 404 is not found, and a contract or network failure is an error with a
+      retry;
+    - a 401 clears the query cache and sends the user to a sign-in page in the public zone, with the address
+      to return to (D-17, amended). The page is a stub: its button is the navigation to the backend's
+      sign-in;
+    - the app zone's routes sit under one pathless layout route. It exists anyway, for the zone's
+      navigation, and it is where the sign-in check and a guard will go;
+    - there is no session, `Permission` or `can()` before a screen needs them (QR-8).
+  - *Designed for, with the support zone's first page:*
+    - the contract lists the permissions as an enum, such as `support:access` and `transactions:write`. The
+      session adapter in `api` exports the generated union, because `api/generated` is private (D-03);
+    - `can()` sits beside the session adapter in `api`: a plain function that React Native reuses (DR-8);
+    - the guard is `beforeLoad` on the support zone's layout route. It reads the session through the query
+      client, and a user without `support:access` sees the same 403 state that a refused request shows;
+    - a button hides through the same `can()`;
+    - a right on one record arrives with the record, as a field the backend computes (`canEdit`). The
+      browser never recomputes it;
+    - delegated access: the session names the account being acted for. Switching accounts refetches the
+      session and clears the cache (D-17).
+- **Evidence:** read and measured 2026-09-11.
+  - Pundit's README: a policy is a class with predicate methods (`def update?`). The repository was pushed
+    2026-08-28 and is not archived.
+  - CanCanCan's README: the rules live in an `Ability` class, as data with conditions
+    (`can :read, Post, user: user`). The repository was pushed 2026-09-08.
+  - Registry: `@casl/ability` 7.0.1 and `@casl/react` 7.0.1 (2026-07-06), one maintainer; the first
+    depends on `@ucast/mongo2js`.
+  - TanStack Router's docs: "A route guard is not a data authorization boundary". A route's `beforeLoad`
+    runs before its children's, so one guard on a layout route covers the zone (D-05).
+  - D-17, accepted: `/me` carries the permissions, and signing out clears the cache.
+- **Wrong if:**
+  - most rights depend on the record, such as rights per wallet or per client across many screens. Then
+    fields on records stop scaling, and C, with the backend exporting its rules, is reconsidered;
+  - the backend's policies are methods and nobody computes a list. Then `/me` carries only the flags the
+    screens use, computed by the backend. That is still A, only a shorter list;
+  - the list grows to hundreds. Then the backend sends only what the frontend uses.
+- **Where it leads:**
+  - *Gains:*
+    - a new role is a backend change and nothing else;
+    - a renamed or removed permission fails `typecheck` at every use;
+    - one line guards a zone;
+    - nothing in the browser pretends to enforce;
+    - a screen stays right when the session's list is stale, because the server's answer wins;
+    - a user always sees what happened and what to do next, whichever request failed.
+  - *Costs:*
+    - the backend keeps the list and its enum in the contract;
+    - a right on one record is a field each resource must carry;
+    - a guarded screen still ships in the bundle until the support zone gets its own build (DR-1).
+  - *Growth path:*
+    - the support zone's first page brings `/me`, the enum, `can()` and the guard;
+    - "add a permission" (QR-17): a value in the contract's enum, regenerate, then `can()` where it is used;
+    - accountants: an account switcher, and a session per account acted for.
 
 ## Course corrections
 
