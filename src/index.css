@@ -1,36 +1,6 @@
-/* Placeholder base styles. Design tokens and primitives arrive with the UI foundation (plan 06, D-07). */
-:root {
-  --text: #6b6375;
-  --text-h: #08060d;
-  --bg: #fff;
-  --sans: system-ui, "Segoe UI", Roboto, sans-serif;
-
-  font: 16px / 1.5 var(--sans);
-  color-scheme: light dark;
-  color: var(--text);
-  background: var(--bg);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --text: #9ca3af;
-    --text-h: #f3f4f6;
-    --bg: #16171d;
-  }
-}
-
-body {
-  margin: 0;
-}
-
+/* The shell's frame around every zone. Colours and type come from the design tokens (D-28). */
 #root {
-  max-width: 1126px;
+  max-width: var(--frame-width);
   margin: 0 auto;
-  padding: 32px;
-  box-sizing: border-box;
-}
-
-h1 {
-  color: var(--text-h);
-  font-weight: 500;
+  padding: var(--space-8);
 }

@@ -3,8 +3,13 @@ import { tanstackRouter } from '@tanstack/router-plugin/vite'
 import react, { reactCompilerPreset } from '@vitejs/plugin-react'
 import { defineConfig } from 'vitest/config'
 
+// QR-22, D-28: the supported browsers, declared once, for scripts and stylesheets alike. They are Vite 8.3's
+// default ('baseline-widely-available'), written out so that an upgrade cannot move the floor unnoticed.
+const BROWSERS = ['chrome111', 'edge111', 'firefox114', 'safari16.4', 'ios16.4']
+
 // https://vite.dev/config/
 export default defineConfig({
+  build: { target: BROWSERS, cssTarget: BROWSERS },
   plugins: [
     // D-05: writes the route tree from src/routes and splits each route's screen into its own chunk.
     // It must come before React's plugin. Its options live in tsr.config.json, which `tsr generate`

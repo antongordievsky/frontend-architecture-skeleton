@@ -1,0 +1,41 @@
+/* D-28: the document's own look, read from the tokens only. The parts style themselves in their modules. */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font: var(--text-md) / var(--line-height) var(--font-sans);
+  color: var(--text);
+  background: var(--surface);
+}
+
+/* A subtree with its own theme paints its own ground, so a dark story looks dark on a light page. */
+[data-theme] {
+  color: var(--text);
+  background: var(--surface);
+}
+
+h1 {
+  margin: 0 0 var(--space-4);
+  font-size: var(--text-xl);
+  font-weight: var(--weight-bold);
+}
+
+code {
+  font-family: var(--font-mono);
+}
+
+/*
+ * D-07: React Aria's usePress inserts this rule as an inline <style>, which the CSP refuses (style-src 'self').
+ * It inserts nothing when an element with the id react-aria-pressable-style exists, and index.html carries one,
+ * so the rule ships here instead. Its layer keeps it below every other rule, as React Aria's own does.
+ */
+@layer {
+  [data-react-aria-pressable] {
+    touch-action: pan-x pan-y pinch-zoom;
+  }
+}

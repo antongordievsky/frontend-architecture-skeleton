@@ -1,0 +1,115 @@
+/*
+ * D-28: the design's decisions, in one file. A redesign changes this file and the parts' stylesheets, never
+ * the screens. scripts/check-tokens.mjs refuses a raw colour, or a custom property's definition, anywhere else.
+ *
+ * Three tiers:
+ * - raw values: the palette and the scales. Parts never read them directly;
+ * - meaning: what a value is for. A theme is one more set of this tier;
+ * - a part's own, where a part needs one. None yet.
+ */
+
+:root {
+  /* Raw: the palette. */
+  --gray-0: #ffffff;
+  --gray-50: #f8fafc;
+  --gray-100: #f1f5f9;
+  --gray-200: #e2e8f0;
+  --gray-300: #cbd5e1;
+  --gray-500: #64748b;
+  --gray-600: #475569;
+  --gray-700: #334155;
+  --gray-800: #1e293b;
+  --gray-900: #0f172a;
+  --gray-950: #0b1120;
+  --blue-300: #93c5fd;
+  --blue-400: #60a5fa;
+  --blue-600: #2563eb;
+  --blue-700: #1d4ed8;
+  --blue-800: #1e40af;
+  --green-400: #4ade80;
+  --green-700: #15803d;
+  --red-400: #f87171;
+  --red-700: #b91c1c;
+
+  /* Raw: spacing, corners, type, motion. */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --font-sans: system-ui, "Segoe UI", Roboto, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --text-sm: 0.875rem;
+  --text-md: 1rem;
+  --text-xl: 1.75rem;
+  --weight-medium: 500;
+  --weight-bold: 600;
+  --line-height: 1.5;
+  --focus-width: 2px;
+  --focus-offset: 2px;
+  --duration-fast: 120ms;
+  --frame-width: 70rem;
+}
+
+/* Meaning: the light theme, the default. */
+:root,
+[data-theme="light"] {
+  color-scheme: light;
+  --surface: var(--gray-0);
+  --surface-raised: var(--gray-50);
+  --text: var(--gray-900);
+  --text-muted: var(--gray-600);
+  --border: var(--gray-200);
+  --accent: var(--blue-700);
+  --accent-hover: var(--blue-800);
+  --on-accent: var(--gray-0);
+  --positive: var(--green-700);
+  --negative: var(--red-700);
+  --focus: var(--blue-600);
+  --disabled: var(--gray-300);
+  --on-disabled: var(--gray-600);
+}
+
+/*
+ * Meaning: the dark theme. The system's setting chooses it unless the page asks for light, and
+ * [data-theme="dark"] chooses it anywhere. CSS cannot name one set for both conditions without light-dark(),
+ * which is newer than the browser list (vite.config.ts), so the two blocks are kept identical by hand.
+ */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --surface: var(--gray-950);
+    --surface-raised: var(--gray-900);
+    --text: var(--gray-100);
+    --text-muted: var(--gray-500);
+    --border: var(--gray-800);
+    --accent: var(--blue-300);
+    --accent-hover: var(--blue-400);
+    --on-accent: var(--gray-950);
+    --positive: var(--green-400);
+    --negative: var(--red-400);
+    --focus: var(--blue-300);
+    --disabled: var(--gray-700);
+    --on-disabled: var(--gray-500);
+  }
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+  --surface: var(--gray-950);
+  --surface-raised: var(--gray-900);
+  --text: var(--gray-100);
+  --text-muted: var(--gray-500);
+  --border: var(--gray-800);
+  --accent: var(--blue-300);
+  --accent-hover: var(--blue-400);
+  --on-accent: var(--gray-950);
+  --positive: var(--green-400);
+  --negative: var(--red-400);
+  --focus: var(--blue-300);
+  --disabled: var(--gray-700);
+  --on-disabled: var(--gray-500);
+}

@@ -3,6 +3,8 @@ import { RouterProvider } from '@tanstack/react-router'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { createQueryClient } from '@/api/queryClient.ts'
+import '@/ui/tokens.css'
+import '@/ui/base.css'
 import './index.css'
 import { createAppRouter, endSession } from './router.ts'
 
