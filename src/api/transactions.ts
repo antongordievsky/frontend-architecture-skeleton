@@ -29,6 +29,7 @@ const toCrypto = (wire: CryptoAmountOutput): CryptoAmount => ({
 const toFiat = (wire: FiatAmountOutput): FiatAmount => ({
   kind: 'fiat',
   currency: wire.currency,
+  exponent: wire.exponent,
   minor: BigInt(wire.minor),
 })
 

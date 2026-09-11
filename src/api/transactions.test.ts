@@ -45,7 +45,7 @@ describe('transactionsQuery', () => {
           id: 'tx-1',
           occurredAt: '2026-09-11T10:00:00Z',
           amount: { kind: 'crypto', asset: 'eth', decimals: 18, units: 1_123_456_789_012_345_678n },
-          value: { kind: 'fiat', currency: 'EUR', minor: 312_345n },
+          value: { kind: 'fiat', currency: 'EUR', exponent: 2, minor: 312_345n },
         },
       ],
       nextCursor: '50',

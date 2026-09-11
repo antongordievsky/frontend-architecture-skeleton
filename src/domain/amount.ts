@@ -11,8 +11,10 @@ export type CryptoAmount<A extends string = string> = {
 
 export type FiatAmount<C extends string = string> = {
   readonly kind: 'fiat'
-  /** ISO 4217. Its minor digits come from `Intl`, so there is no currency table to keep. */
+  /** ISO 4217. */
   readonly currency: C
+  /** Digits of the unit `minor` counts in, as the server sent them: tables disagree (CC-06). */
+  readonly exponent: number
   readonly minor: bigint
 }
 
@@ -62,10 +64,13 @@ export const formatAmount = (amount: Amount, locale: string): string => {
       return numberFormat(locale, { maximumFractionDigits: amount.decimals }).format(
         toDecimalString(amount.units, amount.decimals),
       )
-    case 'fiat': {
-      const format = numberFormat(locale, { style: 'currency', currency: amount.currency })
-      const digits = format.resolvedOptions().maximumFractionDigits ?? 0
-      return format.format(toDecimalString(amount.minor, digits))
-    }
+    case 'fiat':
+      // The amount's own digits, never `Intl`'s table (CC-06), and all of them. The minimum is enough:
+      // `Intl` raises the maximum to meet it. Whether a screen shows fewer is D-27, still open.
+      return numberFormat(locale, {
+        style: 'currency',
+        currency: amount.currency,
+        minimumFractionDigits: amount.exponent,
+      }).format(toDecimalString(amount.minor, amount.exponent))
   }
 }

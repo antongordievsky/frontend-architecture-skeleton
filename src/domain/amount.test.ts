@@ -1,5 +1,11 @@
 import { describe, expect, test } from 'vitest'
-import { addCrypto, type CryptoAmount, formatAmount, toDecimalString } from './amount.ts'
+import {
+  addCrypto,
+  type CryptoAmount,
+  type FiatAmount,
+  formatAmount,
+  toDecimalString,
+} from './amount.ts'
 
 const eth = (units: bigint): CryptoAmount<'eth'> => ({
   kind: 'crypto',
@@ -13,6 +19,14 @@ const fromServer = (asset: string, decimals: number, units: bigint): CryptoAmoun
   decimals,
   units,
 })
+const fiat = (currency: string, exponent: number, minor: bigint): FiatAmount => ({
+  kind: 'fiat',
+  currency,
+  exponent,
+  minor,
+})
+// Intl separates a currency code from the number with a no-break space.
+const plain = (text: string) => text.replaceAll('\u00a0', ' ')
 
 describe('addCrypto', () => {
   test('adds two amounts of the same asset', () => {
@@ -58,10 +72,20 @@ describe('formatAmount', () => {
     )
   })
 
-  test("gives fiat its currency's minor digits", () => {
-    expect(formatAmount({ kind: 'fiat', currency: 'EUR', minor: 123_456n }, 'de-DE')).toBe(
-      '1.234,56 €',
-    )
-    expect(formatAmount({ kind: 'fiat', currency: 'JPY', minor: 1234n }, 'en-US')).toBe('¥1,234')
+  test('takes fiat digits from the amount, never from a currency table (CC-06)', () => {
+    // Intl gives HUF and IDR 0 digits; ISO 4217 gives both 2; Ruby's money gives HUF 0 and IDR 2.
+    expect(plain(formatAmount(fiat('HUF', 2, 123_456n), 'en-US'))).toBe('HUF 1,234.56')
+    expect(plain(formatAmount(fiat('HUF', 0, 1235n), 'en-US'))).toBe('HUF 1,235')
+    expect(plain(formatAmount(fiat('IDR', 2, 123_456n), 'en-US'))).toBe('IDR 1,234.56')
+  })
+
+  test('shows every digit of the unit and rounds nothing, while D-27 is open', () => {
+    expect(plain(formatAmount(fiat('HUF', 2, 123_450n), 'en-US'))).toBe('HUF 1,234.50')
+    expect(plain(formatAmount(fiat('IQD', 3, 1n), 'en-US'))).toBe('IQD 0.001')
+  })
+
+  test('formats fiat in the locale, with the digits the amount carries', () => {
+    expect(formatAmount(fiat('EUR', 2, 123_456n), 'de-DE')).toBe('1.234,56 €')
+    expect(formatAmount(fiat('JPY', 0, 1234n), 'en-US')).toBe('¥1,234')
   })
 })
