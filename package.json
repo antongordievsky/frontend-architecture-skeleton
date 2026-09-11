@@ -18,7 +18,7 @@
     "test": "vitest run",
     "generate": "orval --config orval.config.ts",
     "routes": "tsr generate",
-    "check": "biome ci && bun run lint && sh scripts/check-contract.sh && bun run typecheck && vitest run && vite build --outDir node_modules/.cache/check-build && betterleaks dir --redact --no-banner . && bun audit",
+    "check": "biome ci && bun run lint && sh scripts/check-contract.sh && sh scripts/check-routes.sh && bun run typecheck && vitest run && vite build --outDir node_modules/.cache/check-build && betterleaks dir --redact --no-banner . && bun audit",
     "format": "biome format --write",
     "lint": "oxlint --deny-warnings && node lint/layers.test.mjs",
     "preview": "vite preview",
