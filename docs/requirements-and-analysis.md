@@ -320,7 +320,7 @@ Options are genuinely different approaches, and the company's own stack is alway
 | D-27 | How many digits does a screen show for each currency — every digit of the unit (`HUF 1,234.56`), or the local convention (`1235 Ft`)? A domain question, split from D-08 (CC-06) | QR-2, QR-21 | deferred by the author — needs domain research; until then every digit is shown and nothing is rounded (QR-2) |
 | D-04 | Where does the demo data come from, and how do we keep it out of what users download? | FR-3, QR-6, QR-11, C-2, QR-5, QR-8, QR-9, QR-24, QR-21 | plan 04 |
 | D-17 | How do people sign in, and what does the browser keep so that nobody can steal a session? (design for) | DR-2, QR-11, DR-3, DR-8 | plan 04 |
-| D-09 | How do we know the product works, and that our tests would notice if it stopped? | FR-6, QR-12, QR-22, QR-23, QR-4, QR-8, QR-21, QR-24 | plan 04 (first tests) |
+| D-09 | How do we know the product works, and that our tests would notice if it stopped? (amended: mutation testing deferred as future work) | FR-6, QR-12, QR-22, QR-23, QR-4, QR-8, QR-21, QR-24 | plan 04 (first tests) |
 | D-05 | Routing | FR-4, QR-3, QR-21 | plan 05 |
 | D-18 | Authorization model (design for, guard seam) | DR-3, QR-17 | plan 05 |
 | D-07 | UI foundation: kit, styling model, tokens | FR-5, QR-12, QR-21, QR-22 | plan 06 |
@@ -1537,6 +1537,12 @@ Proving that tests catch what they claim to (QR-23). What teams at scale do:
     Stryker in incremental mode mutates what the plan changed in `domain`, `api` and `mock`, outside
     `check`. Each surviving mutant is killed by a test or recorded with its reason, and the score goes into
     the log. There is no coverage threshold: coverage counts lines run, and the mutation score says more.
+    - *Amended 2026-09-11, agreed by the author:* mutation testing is deferred as extra functionality,
+      beyond the skeleton. Every test is still proven by a deliberate break, recorded in the plan's log
+      (QR-23).
+      - Why: Stryker's client first pulled a `qs` with three advisories (plan 04, cut 2).
+      - What remains: it waits in Part III's "Skipped so far" as future work — a release with the fixed
+        client (stryker-js #6177), or a try of 9.6.0.
 - **Evidence:** measured and read 2026-09-11, on the D-03, D-04 and D-08 spike code, with the app's Vite
   8.3.0 config, Node 24.21.0, Bun 1.4.2.
   - *Vitest 5.0.0 with jsdom 30.0.1* — 8 of 8 passed in 0.9 s (1.2 s wall). The first run failed one test
@@ -1740,7 +1746,7 @@ taken from the bottom and recorded in `ARCHITECTURE.md` § Skipped.
 | What | Why | Where it is recorded | What would bring it back |
 |---|---|---|---|
 | A try-out of the schema check in the transport (`includeZodSchemaInArguments`) | time; D-03 keeps the check in the adapter | plan 04's log, cut 1 | D-03's growth path |
-| Mutation testing in plan 04 | Stryker 10.0.0 pulls `qs` 6.15.1, with three moderate advisories, so `bun audit` fails | plan 04's log, cut 2 | plan 07, by the author's choice (2026-09-11): a Stryker release with the fixed client (stryker-js #6177, open since 2026-08-20); failing that, a try of Stryker 9.6.0, whose client resolves `qs` 6.16 — its fit with Vitest 5 is unmeasured |
+| Mutation testing (Stryker) | at first, Stryker 10.0.0 pulled `qs` 6.15.1, with three moderate advisories, and `bun audit` failed; then, 2026-09-11, the author deferred it as extra functionality. Deliberate breaks prove every test (QR-23) | plan 04's log, cut 2; D-09's amendment | future work: a Stryker release with the fixed client (stryker-js #6177, open since 2026-08-20), or a try of Stryker 9.6.0, whose client resolves `qs` 6.16 (its fit with Vitest 5 is unmeasured) |
 | The throttled browser perf test and its interaction budgets | time, by the author's decision, 2026-09-11 | QR-9, plan 08's row | D-20's growth path |
 | How far a container the agent starts can reach | deferred by the author: not what the take-home is about | D-26 | D-26 |
 | How many digits a screen shows per currency | deferred by the author: a domain question that needs research | D-27, CC-06 | D-27 |
