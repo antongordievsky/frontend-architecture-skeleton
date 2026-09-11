@@ -37,7 +37,9 @@ Everything runs in Docker (C-2). Host commands use the runtimes pinned in `mise.
 - Tests (D-09): `*.test.ts` beside the code they test, run by Vitest in Node — no simulated page;
   anything that renders is Playwright's. A part's states are stories (`<Name>.story.tsx`, one export
   each), mounted by `<Name>.spec.ts` in the story gallery (`playwright/gallery/`, D-14) in Chromium,
-  WebKit and Firefox, with zero-tolerance screenshots in `__screenshots__/`. The baselines are Linux
+  WebKit and Firefox, with zero-tolerance screenshots in `__screenshots__/`. Whole pages and user flows
+  run in Chromium and WebKit only (D-14's amendment, QR-22); the product ships one theme, so a state has
+  one baseline, not one per theme (D-28's amendment). The baselines are Linux
   images, so these run only in the `browser` service; before a commit that changes a part, a story or a
   stylesheet, the agent runs it (D-09's note). The stand-in backend is `mock/handler.ts` (D-04); a
   test plugs it into `fetch` with `asFetch`. Only test files may import from outside `src/`, and only
@@ -108,7 +110,10 @@ Requirements (Part I) are written once and change only with the author's agreeme
   something structural, an `Accepted` decision would have to be violated, or the timebox is about to be
   exceeded (then: propose what to cut).
 - Wrap-up, in order: full `check` (never a partial run) → UI plans: drive the app with Playwright MCP →
-  built-in `/code-review` and `/security-review` on the plan's diff; fix or record findings → append
+  built-in `/code-review` on the plan's diff, and `/security-review` when that diff touches a named surface —
+  a session, permissions, cookies or headers, the CSP or the proxy, the stand-in's HTTP boundary, or a
+  dependency. A plan of tokens, stylesheets and presentational parts skips it, and the plan's log says so and
+  why; fix or record findings → append
   "What happened" to the plan (deviations, surprises, commands run) → commits → fast-forward merge.
 - Subagents: read-only research or independent verification only. They never commit.
 - Reports what happened, including skipped steps and quoted failures. No "should work".

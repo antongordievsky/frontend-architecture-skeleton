@@ -326,11 +326,13 @@ Options are genuinely different approaches, and the company's own stack is alway
 | D-07 | Which library gives our parts their behaviour, so that everyone can use them — by keyboard, screen reader and touch? | QR-12, FR-5, FR-7, QR-11, QR-24, QR-20, QR-21, QR-8 | plan 06 |
 | D-28 | How do we write the look, so the design can change without rewriting the screens? (split from D-07) | FR-5, QR-7, QR-12, QR-22, QR-11, QR-8, QR-24, QR-21, DR-1, QR-17 | plan 06 |
 | D-14 | How do we see every part in every state, and notice when a design change breaks one? | FR-5, QR-12, QR-22, QR-23, QR-24, QR-11, QR-8, QR-21, C-2 | plan 06 |
-| D-06 | State placement (server, URL, client) and the table's data model | FR-3, FR-7, QR-6 | plan 07 |
-| D-19 | Observability and metrics | QR-10, DR-7 | plan 08 |
-| D-20 | Performance strategy and budgets | QR-9, QR-6 | plan 08 |
-| D-11 | CI/CD with agentic checks, and how environments stay close to production (design for) | DR-9, DR-11, QR-15 | plan 09 |
-| D-15 | Extent of the AI layer (commands, agents, MCP beyond the baseline; the path to DR-10) | QR-18, QR-19, QR-8, DR-10 | plan 09 |
+| D-06 | When a screen shows thousands of rows, who decides what is on it: the server, the address, or the browser? | FR-3, FR-7, QR-6, QR-12, QR-9, QR-4, QR-8, QR-24, QR-21 | plan 07 |
+| D-29 | What does the product look like, and where does that look come from? | FR-5, QR-12, QR-8, QR-24, QR-22, QR-17, QR-21 | plan 07 |
+| D-30 | How does a skeleton show three kinds of user without building three products? | DR-1, DR-2, DR-3, DR-4, FR-4, FR-7, QR-8, QR-11, QR-12, QR-22 | plan 09 |
+| D-19 | Observability and metrics | QR-10, DR-7 | plan 10 |
+| D-20 | Performance strategy and budgets | QR-9, QR-6 | plan 10 |
+| D-11 | CI/CD with agentic checks, and how environments stay close to production (design for) | DR-9, DR-11, QR-15 | plan 11 |
+| D-15 | Extent of the AI layer (commands, agents, MCP beyond the baseline; the path to DR-10) | QR-18, QR-19, QR-8, DR-10 | plan 11 |
 
 ## Decisions
 
@@ -2030,6 +2032,13 @@ Out:
     - a part's own, where a part needs one: the button's background, for example.
 
     A theme is one more set of the meaning tier, under `[data-theme]`.
+    - *Amended 2026-09-12 by the author, before plan 07:* the product ships **one theme**. The dark set is
+      removed from the tokens file, and with it the `prefers-color-scheme` block and the hand-kept copy its
+      own § Costs complained about. The mechanism is unchanged and unused: a theme is still one more set of
+      the meaning tier, so a dark theme, or a brand's, returns as one block. What this buys is halved
+      review: every part's look is approved in one set of images instead of two (D-14's amendment). The
+      author's reason: nothing in Part I asked for a dark theme, and it was costing a second baseline per
+      state.
   - *Parts.* Each part's look lives in its own `*.module.css`, beside it. It is styled through React Aria's state
     attributes: `[data-focus-visible]`, `[data-pressed]`, `[data-selected]`.
   - *Why not Tailwind, the company's choice:*
@@ -2133,6 +2142,16 @@ themselves drive. It is decided now because plan 06 builds the first parts, and 
 
   Screenshots are compared with zero tolerance, in three engines, in Microsoft's Playwright image. Pages are then
   tested end to end on the production build (plan 07).
+  - *Amended 2026-09-12 by the author, before plan 07, to spend the browser budget where it finds things:*
+    - *One theme.* A story is a baseline in the one theme the product ships (D-28's amendment). The
+      `colorScheme` loop leaves the specs, and the dark images leave the tree.
+    - *Engines by what they catch.* The three engines stay where pixels actually differ between them —
+      the kit's parts in the gallery. Whole pages and user flows (plans 08, 09) run in **Chromium and
+      WebKit**: QR-22 asks for Chromium "and at least one other engine", and WebKit is the one whose
+      layout and focus behaviour differ most from Chromium's. Firefox keeps every part it renders,
+      through the gallery.
+    - *Cost, named:* a page-level fault that only Firefox shows would be missed. The parts those pages are
+      built from are still compared in Firefox, so what is left uncovered is page layout, not a part.
   - *The chain the author asked for:* parts, then stories that test each part and fix its look, then pages built from
     the parts, then the built app end to end. Every link runs in the engines users have, under one tool.
   - *Why not Storybook, the company's choice:*
@@ -2207,6 +2226,249 @@ themselves drive. It is decided now because plan 06 builds the first parts, and 
     - a list page in the gallery, then typed story ids through the `Stories` registry (1.63);
     - with CI (D-11), a hosted review of the diffs. Chromatic records Playwright tests without Storybook;
     - Storybook itself, if the gallery becomes a tool for designers and product people.
+
+### D-06 — When a screen shows thousands of rows, who decides what is on it: the server, the address, or the browser?
+
+`Accepted` 2026-09-12 · needed by plan 07 · build now · judged by FR-3, FR-7, QR-6, QR-12, QR-9, QR-4, QR-8,
+QR-24, QR-21
+
+**What we are deciding.** The transactions screen is the product's workhorse: a person with years of history
+opens it, narrows it to one kind of transaction, sorts it, and sends the link to their accountant. Three
+places can hold the answer to "what am I looking at" — the server that owns the records, the address in the
+browser's bar, and the screen's own memory. Put it in the wrong place and the symptoms are familiar: a
+shared link opens a different list, the back button loses the filter, or the browser drags a whole tax
+year's records around to sort them. It is decided now because plan 07 builds this screen, and every later
+list in the product will copy whatever it does.
+
+**Not decided here:** how fast it must be, in numbers (D-20); what it looks like (D-07, D-28); who may open
+it (D-18); what we learn when it breaks in front of a user (D-19).
+
+| Criterion | A — the server owns the rows, the address owns the question, the screen owns nothing | B — the browser owns everything: one request for the whole set, sorted in memory | C — as A, but a table-model package computes the table (the company's stack) | D — plain page-by-page navigation, no virtualisation |
+|---|---|---|---|---|
+| FR-3 data through the API layer, one cache entry per question | ✅ cursor pages through the adapter's `queryOptions`, appended as an infinite query | ⚠️ one entry holding 10 000 rows; every filter re-derives from it | ✅ as A | ✅ as A |
+| FR-7 four states on the large dataset | ✅ plus the states beyond the first page: loading more, failing while loading more | ⚠️ one long wait, then no further states | ✅ as A | ✅ simplest: each page is its own four states |
+| QR-6 10 000 rows; the pagination, sorting and filtering model | ✅ cursor paging is stable when rows are inserted (S5); sorting and filtering are the server's | ⚠️ 2.05 MB and a 66.7 ms schema check before the first row appears (measured) | ✅ as A | ⚠️ the model is fine, but the screen never shows more than a page, so nothing proves the scale |
+| QR-12 semantic table, `aria-sort`, keyboard | ✅ the kit's table sets `data-sort-direction` and `aria-sort`, and its rows are keyboard-navigable (types read) | ✅ same markup | ⚠️ the model hands us rows; the markup and its `aria-sort` are still ours to wire | ✅ same markup |
+| QR-9 what the user waits for | ✅ 21 kB per page of 100; ~30 rows in the DOM at any time | ❌ 2.05 MB before anything, on every cold visit | ✅ as A | ✅ small pages, but a person scanning history clicks "next" 100 times |
+| QR-4 React discipline | ✅ nothing is copied into state that the server or the address already answers | ⚠️ the derived list must be computed during render, or it drifts | ✅ as A | ✅ |
+| QR-8 pragmatism — a dependency needs a present consumer | ✅ no new runtime package | ✅ none either | ❌ 34 kB of table model that, with the server sorting, only passes rows through | ✅ |
+| QR-24 supply chain | ✅ nothing new | ✅ | ⚠️ a major five weeks old (9.0.0, 2026-08-04) whose API is rewritten — `useReactTable` no longer exists | ✅ |
+| QR-21 the company's stack | ⚠️ deviates: the company uses a table-model package; ours is the kit D-07 already chose | ⚠️ as A | ✅ exactly their stack | ⚠️ as A |
+| Cost today | ⚠️ the contract gains a sort parameter; the stand-in must honour it; the kit's virtualiser is wired once | ✅ least code | ❌ as A, plus a package and its rewritten API to learn | ✅ least code |
+| Cost of changing later | ✅ a model can slot under the same markup when grouping or column resizing arrives | ⚠️ moving work to the server later rewrites the screen's data path | ✅ | ⚠️ adding virtualisation later changes the markup |
+
+- **Decision:** the server owns the rows, the address owns the question, and the screen's memory holds only
+  what dies with it.
+  - *The server owns the rows.* Pages of 100 by cursor, fetched as an infinite query through the resource
+    adapter (D-03), so one cache entry belongs to one filter-and-sort combination and pages are appended to
+    it. Sorting and filtering are the server's work: the contract gains a `sort` parameter and the stand-in
+    backend implements it (D-04).
+  - *The address owns the question.* The kind filter and the sort live in the route's search schema, with
+    `catch` defaults (D-05), so a filtered, sorted list is a link a person can share and a back button can
+    restore.
+  - *The screen owns only the ephemeral* — which rows are ticked (a `Set` of ids) and where the scroll is.
+    Nothing the server or the address already answers is copied into React state (QR-4).
+  - *The table is the kit's.* React Aria's Table inside its `Virtualizer` with `TableLayout`, so the number
+    of rows in the DOM does not grow with the dataset. Columns are data in the page module, not markup
+    repeated per row. `TableLoadMoreItem` asks for the next page when the sentinel comes into view.
+  - *Nothing is computed from the pages already loaded.* Sorting, filtering, counts, totals, "select all"
+    and export answer for the whole matching set, which only the server knows. The kit's column sort writes
+    the new order into the address and starts a new query; it never reorders the rows in hand. This is the
+    rule that makes the whole decision hold together: a partial answer presented as a complete one is a bug
+    the user cannot see — the first page of 100 sorted by value looks exactly like the 100 largest
+    transactions, and is not.
+  - *A stable order.* The sort key is always paired with the row id as a tiebreaker. A cursor walking a
+    non-unique key — two transactions at the same timestamp, two equal fiat values — otherwise repeats a row
+    on one page and skips another, and the user sees neither problem.
+  - *No table-model package.* With the server sorting and filtering, a headless model would only hand our
+    rows back to us (QR-8). The deviation from the company's stack (QR-21) is named here and revisited the moment
+    the table needs grouping or resizable columns.
+- **Evidence:** measured 2026-09-12 on this machine, Bun 1.4.2, unless stated.
+  - *The dataset (D-04's generator, seed 42, 10 000 rows):* the whole set is 2.05 MB of JSON; a page of 100
+    is 21 414 bytes, a page of 200 is 42 615 bytes. The contract's `limit` maxes at 200, so the whole set is
+    50–100 requests.
+  - *The schema check (zod 4.5.4, D-03's adapter):* the whole set 66.7 ms, a page of 100 0.4 ms.
+  - *Sorting in the browser is not the expensive part:* 10 000 domain rows sort in 1.7 ms by date and 4.2 ms
+    by a `bigint` fiat value, and filter to the 3 030 trades in 0.9 ms. What costs is delivering and checking
+    2.05 MB, which is why the work moves to the server rather than the sort itself.
+  - *The kit (react-aria-components 1.21.0, installed):* `Column` carries `allowsSorting`, `sortDirection`,
+    `sort(direction)` and a `data-sort-direction` selector; `TableLoadMoreItem` wraps a load-more sentinel;
+    `Virtualizer` takes a layout and `TableLayout` is exported for tables.
+  - *Bundle spike* (`bun build --minify`, React external, gzip -9): the kit's Button alone 13 550 B; the
+    Table 57 650 B; Table plus Virtualizer 63 885 B. Against what a screen already ships, the table costs
+    about 44 kB and virtualisation 6.2 kB.
+  - *The rejected package:* `@tanstack/react-table` 9.2.4 (2026-08-28), whole package 34 423 B gzip, MIT,
+    provenance, 3 maintainers, last commit in TanStack/table 2026-09-10, 14.9 M downloads in the week to
+    2026-09-10. Its major 9.0.0 is from 2026-08-04 and the React API is rewritten: `useReactTable` is gone,
+    replaced by `useTable`/`createTableHook`, with the previous API only under `./legacy`.
+    `@tanstack/react-virtual` 3.14.12 (2026-09-11) is inside the quarantine; 3.14.10 (2026-08-18) is past it.
+  - *Already in the project:* `@tanstack/react-query` 5.102.8 ships `infiniteQueryOptions`; the contract
+    already carries `cursor`, `limit` and `kind`, and no sort.
+- **Wrong if:**
+  - the screen grows grouping, resizable or reorderable columns, or a reconciliation view across rows — then
+    a headless table model earns its 34 kB, and it goes under this same markup;
+  - the product wants spreadsheet-style filtering across the whole history without a round trip — then the
+    one-request model returns, at the 2.05 MB and 66.7 ms measured above;
+  - the kit's virtualised table cannot hold a sticky header, `aria-sort` and keyboard navigation together in
+    all three engines — plan 07 measures this; then the table stays unvirtualised and TanStack Virtual is
+    reconsidered.
+- **Where it leads:**
+  - *Gains* — one home per question, so a shared link reproduces the screen exactly; the DOM holds about
+    thirty rows whatever the dataset's size; the cache holds domain rows already checked against the
+    contract, so a screen never parses money.
+  - *Costs* — the contract and the stand-in grow a sort parameter; the four states must also be shown for
+    pages after the first; virtualisation gives up the browser's own find-in-page and printing (S5), which
+    `ARCHITECTURE.md` records as a named trade.
+  - *Named, not built in plan 07* — each would be answered by the server under the rule above, and each is
+    a feature, not a seam: sorting by several columns at once; free-text search; a total row and a result
+    count (a count over millions of rows is itself a server decision, so screens say "many", not a wrong
+    number); jumping to page N, which a cursor cannot do and an offset can; selecting every row that matches
+    a filter rather than every row on screen; exporting that same matching set; showing, hiding, resizing and
+    reordering columns, and where such a preference lives — the address, or the user's profile on the server.
+  - *Growth path* — new filters are one field at a time in the search schema; when the real backend publishes
+    its contract, only parameter names change, not the screen; a table model, if it is ever needed, slots
+    under the markup without touching the data path.
+
+### D-29 — What does the product look like, and where does that look come from?
+
+`Accepted` 2026-09-12 · needed by plan 07 · build now · judged by FR-5, QR-12, QR-8, QR-24, QR-22, QR-17, QR-21
+
+**What we are deciding.** The skeleton works, and it looks like nothing: a row of links in the browser's default
+type on a white page. The first thing anyone opens is a screen, and a screen that looks unfinished is read as work
+that is unfinished. At the same time the look must not arrive as a second framework, because the whole point of
+how styles are written here (D-28) is that the design is ours to change. So the question is where a finished look
+comes from, and how much of the toolchain it is allowed to bring with it.
+
+It is decided now because plan 07 writes the shell every later screen sits in, and because the transactions table
+(plan 08) should be photographed once, against the final palette, not twice.
+
+**Not decided here:**
+- how styles are written, and where tokens live (D-28);
+- which library gives the parts their behaviour (D-07);
+- what the three audiences see (D-30);
+- icons, which arrive with their first use.
+
+| Criterion | A — keep today's tokens, add only layout | B — re-tune the tokens to a palette proven in the author's other product | C — B plus a self-hosted display font | D — a component library with a theme (Mantine, a Tailwind preset) |
+|---|---|---|---|---|
+| Looks finished | ❌ browser defaults on white | ✅ cool-neutral surfaces, one accent, shadows and corners that agree | ✅ the most distinct of the four | ✅ someone else's finished look |
+| D-28 "a redesign changes the tokens file, never the screens" | ❓ never exercised | ✅ **the redesign is the proof**: the whole palette moves and no screen file changes | ✅ as B | ❌ replaces D-28 |
+| QR-8, QR-24 packages | ✅ none | ✅ none | ⚠️ one package, one more asset to serve | ❌ a framework and its tree |
+| QR-11 the production CSP | ✅ untouched | ✅ untouched | ⚠️ `font-src 'self'` added in the Caddyfile and in the header check | ⚠️ depends on the library |
+| QR-22 the browser floor | ✅ | ✅ hex and `color-mix`, both inside Vite's target | ✅ | ⚠️ the library's own floor |
+| QR-12 contrast and focus | ✅ unchanged | ⚠️ every pair is re-checked by axe in the flows | ⚠️ as B | ✅ |
+| Cost today | ✅ nothing | ⚠️ one file, plus the parts' stylesheets; the baselines are re-shot once | ⚠️ as B, plus the package ask and the CSP line | ❌ a new styling decision |
+| Cost of changing later | — | ✅ one file again | ✅ one file and one asset | ❌ every part rewritten |
+| QR-21 the company's stack | ⚠️ neither way | ⚠️ ours, as D-28 already deviates | ⚠️ as B | ✅ Mantine is named |
+
+- **Decision:** B. The token file keeps its three tiers and changes its values, taking them from the palette the
+  author already runs in another product (`careero`): cool-neutral surfaces, an indigo accent, a corner and shadow
+  scale. No package, no framework, no second stylesheet.
+  - *One theme.* The dark set is gone (D-28's amendment). What ships is one palette, and the mechanism for a
+    second stays where it was.
+  - *Type is a stack, not a download.* `--font-sans` stays a plain sans-serif stack. The baselines are photographed
+    on Linux inside Microsoft's Playwright image, so the stack is written to resolve to one family **there** as
+    well as on a designer's Mac; plan 07 measures what the image actually resolves before the stack is fixed, and
+    records it. A real display font is C, and it is on the growth path, not in this plan.
+  - *New tokens the shell needs,* in the tiers that already exist: a corner and shadow scale (raw), and the
+    layout's own measurements — the sidebar's width, the header's height, the page's padding (meaning).
+  - *What must not change:* no screen's `.tsx` file. If a screen has to be edited to take the new look, that is
+    D-28 failing, and the entry is wrong, not the screen.
+- **Evidence:** read and counted 2026-09-12.
+  - The palette is read from `~/Projects/careero/docs/design/_shared/tokens.css`: surfaces `#f3f5f9 / #fff /
+    #eff2f7`, ink `#0f172a / #475569`, lines `#dde1ea`, an indigo accent in `oklch`, a five-step corner scale and
+    three shadows. It is a palette in daily use, not one invented here.
+  - The tree holds 36 baseline images today (Button 18, Link 18), of which 18 are dark and leave with D-28's
+    amendment.
+  - `scripts/check-tokens.mjs` already refuses a colour written anywhere but the tokens file, and any `var(--…)`
+    the file does not define, so the port cannot be half-done: a value left behind fails `check`.
+  - *Not measured:* which family `system-ui` resolves to inside the Playwright image; the contrast ratios of the
+    new pairs. Plan 07 measures both, the second through axe.
+- **Wrong if:**
+  - a real brand arrives from the company. Then its values replace these, in the same file — which is the point;
+  - axe finds a contrast pair below AA that cannot be tuned without losing the look. Then the accent moves, not
+    the mechanism;
+  - the screenshots turn out to depend on a font the image does not have. Then the stack is pinned to what the
+    image has, and the difference between the designer's screen and the baseline is recorded.
+- **Where it leads:**
+  - *Gains:* a screen that looks deliberate; D-28's central promise exercised rather than asserted; no dependency
+    added; one theme to review instead of two.
+  - *Costs:* the baselines are re-shot once, and a reviewer looks at 18 new images; the palette is borrowed, so it
+    is not the company's brand and `ARCHITECTURE.md` says so.
+  - *Growth path:* a display font as a token change plus `font-src 'self'`; a brand theme as one more block; a
+    design tool's export that writes the tokens file (D-28).
+
+### D-30 — How does a skeleton show three kinds of user without building three products?
+
+`Accepted` 2026-09-12 · needed by plan 09 · build now (thin) · judged by DR-1, DR-2, DR-3, DR-4, FR-4, FR-7, QR-8,
+QR-11, QR-12, QR-22
+
+**What we are deciding.** The product serves three audiences (§1): a visitor who has not signed in, a taxpayer,
+and the internal team who look at other people's accounts. The skeleton so far shows one of them. A reviewer
+cannot see that the zones are real, because nothing walks from one to another, and the guard written into D-18
+has never refused anybody. The question is the smallest thing that makes all three real — real enough to walk
+through in a browser, and honest enough that nobody mistakes it for a security mechanism.
+
+It is decided now because plan 09 builds the support zone's first page, which is the trigger D-18 named:
+"nothing else is built before the support zone's first page".
+
+**Not decided here:**
+- the identity provider and the real sign-in flow (D-17: a navigation to the backend);
+- what the support team actually needs to do (DR-4 beyond one screen);
+- the look (D-29).
+
+| Criterion | A — no session: every screen open, sign-up a dead form | B — the stand-in backend owns the session | C — a flag in browser storage | D — a real identity provider |
+|---|---|---|---|---|
+| Three flows a person can walk | ❌ the form leads nowhere | ✅ guest → sign up → taxpayer → support → sign out | ⚠️ walks, but proves nothing | ✅ |
+| DR-3, D-18 the guard is exercised | ❌ nothing to refuse | ✅ a taxpayer opening the support zone is refused, and the refusal is a test | ⚠️ refuses its own flag | ✅ |
+| DR-2, QR-11 no token in the browser | ✅ vacuously | ✅ an httpOnly cookie the page cannot read | ❌ **the lint rule forbids exactly this**, and rightly | ✅ |
+| D-17's CSRF header ever proven | ❌ | ✅ the stand-in refuses a mutation without it, as Rails does | ❌ | ✅ |
+| QR-8 cost today | ✅ | ⚠️ three paths in the contract, a map of sessions in the stand-in, one zone | ✅ | ❌ no backend exists |
+| Honest to a reviewer | ⚠️ the empty form is the dishonest part | ✅ the actor switch is labelled as the stand-in's shortcut | ❌ looks like auth, is not | ✅ |
+| Cost of changing later | — | ✅ the real backend replaces the stand-in; the frontend does not move | ⚠️ thrown away | — |
+
+- **Decision:** B. The stand-in backend gains a session, and the frontend gains the three things D-17 and D-18
+  designed for and deliberately did not build.
+  - *The contract* grows `POST /session`, `GET /me` and `DELETE /session`, a `User`, and `Permission` as an enum
+    that generates the union D-18 promised. Everything else follows from the generated types.
+  - *The stand-in* keeps sessions in memory, addressed by an opaque id in a cookie that is `HttpOnly`,
+    `SameSite=Lax` and `Path=/`. It refuses any non-GET without `X-CSRF-Token`, exactly as D-17 wrote, so the
+    transport's header is proven by the first mutation rather than promised.
+  - *Sign-up chooses the actor* — taxpayer or support — and the page says in its own words that this is the
+    stand-in's shortcut, standing in for the backend's sign-in (D-17). A demo that hides what it is would be worse
+    than no demo.
+  - *The frontend* gets the session as one typed query, one `can(session, permission)`, and one guard in
+    `beforeLoad`: on the app's layout route, and on the support zone's. A taxpayer who opens a support address
+    meets the same "no access" screen the API's 403 produces (D-18).
+  - *The support zone* is `src/admin/`, with one page: a list of accounts, sorted and paged by the server, drawn
+    with the same `ui/Table` the taxpayer's transactions use. Its zone row joins the lint map, whose fixture cases
+    for `admin/` were written in plan 03 and have been waiting since.
+  - *Three flows, three specs,* in Chromium and WebKit (D-14's amendment), each with axe.
+- **Evidence:** read 2026-09-12.
+  - D-18's entry sets the trigger, and names what is built with the first support page: the session carries a flat
+    list of permissions, `Permission` comes from the contract, one `can()`, one guard in a layout route's
+    `beforeLoad`.
+  - D-17's entry sets the mechanism: httpOnly cookie, `credentials: 'same-origin'` already in the transport, the
+    CSRF header on every non-GET, and the stand-in answering 403 without it.
+  - `lint/fixtures/layers/src/admin/` already holds the marked cases for a support zone, from plan 03; the zone
+    list in `.oxlintrc.json` is `["app", "public"]` and gains one entry.
+  - The route guard's seat exists: `src/routes/_app.tsx` is the layout route, and `sign-in.tsx` already validates
+    a return address that must be a path on this site.
+  - *Not measured:* what the session adds to the first screen's cost, which plan 10's budget would weigh.
+- **Wrong if:**
+  - the actor switch is read as a claim about security. Then it is moved behind an obvious stand-in marker, or
+    removed and the support zone reached by an address alone;
+  - `docker compose up` stops showing data to someone who has not signed in. The guest must still see something
+    real, so the transactions page stays reachable in the taxpayer's flow and the guard sends the signed-out
+    visitor to the public zone rather than to an empty screen;
+  - the support zone grows past one screen inside this take-home. That is DR-4, and it is not this.
+- **Where it leads:**
+  - *Gains:* the three zones stop being folders and become three journeys a reviewer can walk; D-17 and D-18 stop
+    being paper; the guard, the 401 path and the CSRF header each get a test; `ui/Table` is proven reusable by a
+    second, unrelated screen.
+  - *Costs:* the stand-in holds state, so each flow resets it; the contract grows; one more zone to keep isolated.
+  - *Growth path:* the real backend answers the same three paths and nothing in the frontend moves; delegated
+    access (an accountant acting for a client) is a different session payload, not a different mechanism; the
+    support zone's remaining screens are DR-4.
 
 ## Course corrections
 
@@ -2402,9 +2664,13 @@ the correction is recorded here, dated, with what triggered it. This is the chai
 
 # Part III — Delivery
 
-Draft order, finalised as each plan is written. **Cut line:** plans 01–07 are the must-have skeleton;
-08–09 are stretch, except the documentation in 09, which is must. If a timebox is exceeded, the cut is
-taken from the bottom and recorded in `ARCHITECTURE.md` § Skipped.
+Draft order, finalised as each plan is written. **Cut line:** plans 01–09 are the skeleton; 10 is stretch,
+and the documentation in 11 is must. If a timebox is exceeded, the cut is taken from the bottom and recorded
+in `ARCHITECTURE.md` § Skipped.
+
+*Re-ordered 2026-09-12, at the author's word.* The look and the shell move ahead of the transactions page, so
+that the table is photographed once against the final palette instead of twice; and the three audiences get a
+plan of their own (D-30), because the zones were folders nobody could walk between.
 
 | Plan | Slice |
 |---|---|
@@ -2414,9 +2680,11 @@ taken from the bottom and recorded in `ARCHITECTURE.md` § Skipped.
 | 04 | Contract and API layer: contract, codegen, typed transport, amounts, typed mocks, dataset |
 | 05 | Routing: shell, routes, typed params, permission guard seam |
 | 06 | UI foundation: tokens, primitives, a11y defaults |
-| 07 | Transactions page: table over 10 000 rows, four states, tests across the trophy |
-| 08 | Observability seam with Web Vitals, and a bundle-size budget (stretch). Partial by the author's decision, 2026-09-11: the throttled perf test is skipped on purpose (QR-9), for `ARCHITECTURE.md` § Skipped |
-| 09 | `ARCHITECTURE.md` assembled from Part II conclusions (Decision, Where it leads) and the course corrections, README, AI-layer paragraph, final review |
+| 07 | Look and shell: one theme's tokens (D-29), the sidebar the zones share, a text field, the baselines re-shot |
+| 08 | Transactions page: table over 10 000 rows, four states, tests across the trophy |
+| 09 | Three audiences (D-30): the stand-in's session, sign-up, the support zone's first screen, and the guest, taxpayer and support journeys walked in the browser |
+| 10 | Observability seam with Web Vitals, and a bundle-size budget (stretch). Partial by the author's decision, 2026-09-11: the throttled perf test is skipped on purpose (QR-9), for `ARCHITECTURE.md` § Skipped |
+| 11 | `ARCHITECTURE.md` assembled from Part II conclusions (Decision, Where it leads) and the course corrections, README, AI-layer paragraph, final review |
 
 **Skipped so far, on purpose** — the source of `ARCHITECTURE.md` § Skipped, kept as cuts happen:
 
@@ -2427,3 +2695,13 @@ taken from the bottom and recorded in `ARCHITECTURE.md` § Skipped.
 | The throttled browser perf test and its interaction budgets | time, by the author's decision, 2026-09-11 | QR-9, plan 08's row | D-20's growth path |
 | How far a container the agent starts can reach | deferred by the author: not what the take-home is about | D-26 | D-26 |
 | How many digits a screen shows per currency | deferred by the author: a domain question that needs research | D-27, CC-06 | D-27 |
+
+## Inputs for plan 09 — what the final documents carry
+
+Given by the author 2026-09-12, before plan 07, so they are not lost when the documents are written.
+
+| Input | What it is | Where it lands |
+|---|---|---|
+| **Raising the floor for a whole team** | The next step after this skeleton is not more code: it is the written rules, recipes and agent skills that make every developer's output safer and more maintainable — the working agreement, the gates, and the review commands, generalised beyond one repository | `ARCHITECTURE.md` § Next, as one of the named directions; judged against D-15 (how far the AI layer goes) and DR-6 (security with agents) |
+| **Effort metrics from the session logs** | After delivery, read this project's agent session logs and separate the author's own attention (when messages were written, decisions accepted) from the agents' wall-clock time, and both from waiting. The take-home is sized in the author's hours; an agent's hours are not the same currency. The commit history is scattered because a Claude Pro subscription pauses work in five-hour windows, and because parts of this skeleton are also wanted for the author's own project, which bought it more attention than the brief alone would | a short summary document, with the method stated (which log fields, how a gap is classified) so the numbers are checkable |
+| **The author's principles** | 3.1 never drift from the real project — requirements first, taken from the product and its posting; 3.2 evidence everywhere, and the code must actually run — the agent proved each test and gate by a deliberate break; 3.3 keep the documentation and the reasoning behind it, because losing that context is what makes onboarding expensive: a newcomer cannot tell what was deliberate; 3.4 security carries extra weight with AI agents and with npm as it is today; 3.5 alternatives must sometimes be considered away from the project's habits, because a spread of viewpoints is how a project grows; 3.6 trade-off tables are worth the time, but a small proof is worth more — much of this work's agent time went into spikes that confirmed or refuted them; 3.7 technology moves in a spiral and a finished decision suggests a better one, so the backlog comes from talking to engineers, customers and stakeholders and from reading risk, not from a fixed plan | the summary document, and `ARCHITECTURE.md` where a principle explains a decision |
