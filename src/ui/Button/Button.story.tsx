@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Button } from './Button.tsx'
 
-// D-14: one export per state. Each is mounted by Button.spec.ts in Playwright's gallery, in both themes.
+// D-14: one export per state. Each is mounted by Button.spec.ts in Playwright's gallery, in three engines.
 export const Primary = () => <Button>Try again</Button>
 
 export const Disabled = () => <Button isDisabled>Try again</Button>

@@ -1,7 +1,8 @@
 import { expect, test } from '@playwright/test'
 
 // D-07, QR-12: the button's behaviour comes from React Aria, its look from the tokens (D-28). The screenshots
-// are compared with zero tolerance, in each engine and theme (D-14).
+// are compared with zero tolerance, in each engine (D-14). The product ships one theme, so each state has one
+// baseline (D-28, amended 2026-09-12).
 
 test('a press counts by pointer, Enter and Space', async ({ mount }) => {
   const story = await mount('ui/Button/Pressable')
@@ -26,18 +27,10 @@ test('a disabled button is disabled, and says so to the pointer', async ({ mount
   await expect(button).toHaveCSS('cursor', 'not-allowed')
 })
 
-for (const colorScheme of ['light', 'dark'] as const) {
-  test.describe(`the ${colorScheme} theme`, () => {
-    test.use({ colorScheme })
-
-    test('looks as approved: at rest, focused, disabled', async ({ mount, page }) => {
-      const primary = await mount('ui/Button/Primary')
-      await expect(primary).toHaveScreenshot(`primary-${colorScheme}.png`)
-      await page.keyboard.press('Tab')
-      await expect(primary).toHaveScreenshot(`primary-focused-${colorScheme}.png`)
-      await expect(await mount('ui/Button/Disabled')).toHaveScreenshot(
-        `disabled-${colorScheme}.png`,
-      )
-    })
-  })
-}
+test('looks as approved: at rest, focused, disabled', async ({ mount, page }) => {
+  const primary = await mount('ui/Button/Primary')
+  await expect(primary).toHaveScreenshot('primary.png')
+  await page.keyboard.press('Tab')
+  await expect(primary).toHaveScreenshot('primary-focused.png')
+  await expect(await mount('ui/Button/Disabled')).toHaveScreenshot('disabled.png')
+})

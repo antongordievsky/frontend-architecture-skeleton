@@ -10,13 +10,7 @@ body {
   margin: 0;
   font: var(--text-md) / var(--line-height) var(--font-sans);
   color: var(--text);
-  background: var(--surface);
-}
-
-/* A subtree with its own theme paints its own ground, so a dark story looks dark on a light page. */
-[data-theme] {
-  color: var(--text);
-  background: var(--surface);
+  background: var(--surface-page);
 }
 
 h1 {
