@@ -1,6 +1,6 @@
 import babel from '@rolldown/plugin-babel'
 import react, { reactCompilerPreset } from '@vitejs/plugin-react'
-import { defineConfig } from 'vite'
+import { defineConfig } from 'vitest/config'
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -11,4 +11,6 @@ export default defineConfig({
     // component, which belongs in the domain anyway (QR-2).
     babel({ presets: [reactCompilerPreset({ panicThreshold: 'all_errors' })] }),
   ],
+  // D-09: Vitest runs logic in Node, with no page; anything that renders is Playwright's.
+  test: { include: ['src/**/*.test.ts', 'mock/**/*.test.ts'] },
 })

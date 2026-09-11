@@ -1,0 +1,33 @@
+{
+  // D-01, DR-8: the domain compiles without the DOM, so a React Native app can take it as it is.
+  // tsconfig.app.json checks the same files with the DOM; this one proves they never need it.
+  "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.domain.tsbuildinfo",
+    "target": "es2023",
+    "lib": ["ES2023"],
+    "types": [],
+    "skipLibCheck": true,
+
+    /* Bundler mode */
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+
+    /* Strictness — D-22 */
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+
+    /* Linting */
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "erasableSyntaxOnly": true,
+    "noFallthroughCasesInSwitch": true
+  },
+  "include": ["src/domain"],
+  // Tests import the runner, whose types assume a host; tsconfig.app.json checks them.
+  "exclude": ["src/domain/**/*.test.ts"]
+}
