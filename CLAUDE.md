@@ -55,14 +55,17 @@ Everything runs in Docker (C-2). Host commands use the runtimes pinned in `mise.
   the working tree differs from what it checks; set unrelated changes aside with
   `git stash push --include-untracked -- <paths>`.
   - pre-commit — the staged secrets scan and the full `check`, plus the Docker gate when dependencies
-    or the image change;
+    or the image change, and the lockfile's age gate when `bun.lock` changes: a version the commit adds
+    must be older than the quarantine (CC-08);
   - commit-msg — the Conventional Commits header, at most 100 characters;
   - pre-push — `check` in Docker and the header test on the production form, on its own compose project
     and port (`PRE_PUSH_PORT`, default 18080).
 - Adding a package (D-23): verify it first (Security below), then `mise exec -- bun add <name>`. It
   asks the author, saves an exact version, and refuses versions younger than 7 days.
 - Updating (QR-25): one batch at the start of a plan — `bun outdated`, then `bun update <names>`,
-  majors one at a time with the changelog read; one commit per batch, through `check`.
+  majors one at a time with the changelog read; one commit per batch, through `check`. The batch opens
+  with `NODE_USE_ENV_PROXY=1 mise exec -- node scripts/check-lockfile-age.mjs --all`, which shows that
+  nothing locked is younger than the quarantine.
 - The agent's shell is non-interactive and has no mise hook — on its own it picks nvm's Node — so the
   agent runs every project command through `mise exec --`. Package changes ask the author either way.
 

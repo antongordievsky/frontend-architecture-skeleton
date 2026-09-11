@@ -16,6 +16,13 @@ run() {
 }
 
 run betterleaks git --pre-commit --staged --redact --no-banner .
+
+# CC-08: a version younger than the quarantine cannot enter the lockfile, whatever wrote it. Node's fetch
+# needs NODE_USE_ENV_PROXY=1 behind the agent's sandbox proxy; elsewhere it changes nothing.
+if git diff --cached --name-only | grep -qx 'bun\.lock'; then
+  run env NODE_USE_ENV_PROXY=1 node scripts/check-lockfile-age.mjs
+fi
+
 run bun run check
 
 # Plan 01's lesson: a dependency change must also pass where the image installs from the lockfile.

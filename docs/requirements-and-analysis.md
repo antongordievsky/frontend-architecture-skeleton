@@ -862,6 +862,13 @@ how much the package manager already enforces, what we add to it, and what stays
     the author approves; the agent's settings make every package command ask.
   - *Updates, a human step* — one batch at the start of each plan: `bun outdated`, then `bun update` for
     the batch, majors one at a time with the changelog read, each batch one commit through `check`.
+  - *Amended 2026-09-11 by plan 05a, agreed by the author (CC-08): the lockfile itself is checked too.*
+    - A pre-commit gate asks the registry when each version a commit adds to `bun.lock` was published. It
+      refuses one younger than the quarantine, unless its name is in `minimumReleaseAgeExcludes`.
+    - It fails when the registry cannot be reached.
+    - `--all` checks the whole lockfile, and opens each update batch.
+    - Bun's resolver already refuses such a version. The gate catches whatever writes the lockfile without
+      the resolver.
 - **Evidence:** measured 2026-09-10 on scratch projects with Bun 1.4.2.
   - *Quarantine* — see the table. A frozen install from our own lockfile passed although it holds
     oxlint 1.82.0, which is 3 days old. So the quarantine guards the moment a version is added, not
@@ -2228,6 +2235,19 @@ the correction is recorded here, dated, with what triggered it. This is the chai
   - The three versions leave the quarantine by themselves on 2026-09-16 and 2026-09-17.
   - What would close the gap is a check that fails while any locked version is younger than the quarantine,
     unless it is named in `minimumReleaseAgeExcludes` with a reason. That is for the author to decide.
+- *Measured again the same day, in plan 05a:*
+  - The lockfile held 64 versions younger than the quarantine, not 3. 13 are orval's reviewed exception. The
+    other 51 include 19 `@oxlint/*` and 16 `@rolldown/*` binaries.
+  - All 51 came in on 2026-09-10 between 16:00 and 16:08, through plan 01's commits. The last of them,
+    `vite` 8.3.0, leaves the quarantine on 2026-09-17 at 11:30 UTC.
+  - "Assumed" above overstates what was unknown. D-23's evidence had already seen oxlint 1.82.0, then 3 days
+    old, pass a frozen install, and concluded that the quarantine guards additions, not reinstalls. What
+    nobody measured was how many young versions the lockfile already held.
+  - Bun's resolver holds. A lockfile resolved today with the quarantine on held 0 young versions out of 375,
+    transitive ones included.
+- *Changed in plan 05a, agreed by the author:* a pre-commit gate refuses any version younger than the quarantine
+  that a commit adds to `bun.lock` (D-23, amended). The 51 are already locked, so the gate does not see them.
+  They are recorded here, and they leave the quarantine by themselves.
 
 ### CC-09 — Reading a package's code was assumed to show every style it injects · 2026-09-11
 
