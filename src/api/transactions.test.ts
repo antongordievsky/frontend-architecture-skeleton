@@ -25,7 +25,7 @@ const deposit = {
   id: 'tx-1',
   occurredAt: '2026-09-11T10:00:00Z',
   amount: { asset: 'eth', decimals: 18, baseUnits: '1123456789012345678' },
-  value: { currency: 'EUR', minor: '312345' },
+  value: { currency: 'EUR', exponent: 2, minor: '312345' },
 }
 
 const fetchPage = () =>
@@ -57,6 +57,11 @@ describe('transactionsQuery', () => {
     const error = await fetchPage().catch((e: unknown) => e)
     expect(error).toBeInstanceOf(ApiError)
     expect(error).toMatchObject({ problem: { kind: 'contract' } })
+  })
+
+  test('refuses a fiat amount without its exponent: its unit would be a guess (CC-06)', async () => {
+    respond({ items: [{ ...deposit, value: { currency: 'EUR', minor: '312345' } }] })
+    await expect(fetchPage()).rejects.toMatchObject({ problem: { kind: 'contract' } })
   })
 
   test('keys the cache by the generated key, with the parameters', () => {

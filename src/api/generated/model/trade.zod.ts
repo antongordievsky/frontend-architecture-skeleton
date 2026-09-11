@@ -17,6 +17,9 @@ export const tradeBoughtDecimalsMax = 36;
 
 export const tradeBoughtBaseUnitsRegExp = new RegExp('^-?[0-9]+$');
 export const tradeValueCurrencyRegExp = new RegExp('^[A-Z]{3}$');
+export const tradeValueExponentMin = 0;
+export const tradeValueExponentMax = 4;
+
 export const tradeValueMinorRegExp = new RegExp('^-?[0-9]+$');
 
 export const Trade = /*#__PURE__*/ zod.object({
@@ -35,8 +38,9 @@ export const Trade = /*#__PURE__*/ zod.object({
 }).check(/*#__PURE__*/ zod.describe('An amount in the asset\'s smallest unit, as an integer string; decimals travel with it (D-08).')),
   "value": /*#__PURE__*/ zod.object({
   "currency": /*#__PURE__*/ zod.string().check(/*#__PURE__*/ zod.regex(tradeValueCurrencyRegExp)).check(/*#__PURE__*/ zod.describe('ISO 4217')),
+  "exponent": /*#__PURE__*/ zod.int().check(/*#__PURE__*/ zod.gte(tradeValueExponentMin)).check(/*#__PURE__*/ zod.lte(tradeValueExponentMax)),
   "minor": /*#__PURE__*/ zod.string().check(/*#__PURE__*/ zod.regex(tradeValueMinorRegExp))
-}).check(/*#__PURE__*/ zod.describe('An amount in the currency\'s minor unit, as an integer string (D-08).'))
+}).check(/*#__PURE__*/ zod.describe('An amount as an integer string in the minor unit the server counts in, with that unit\'s exponent: minor 123456 with exponent 2 is 1234.56. Currency tables disagree on the exponent, so it travels with the amount (D-08, CC-06).'))
 })
 
 export type Trade = zod.input<typeof Trade>;

@@ -7,12 +7,16 @@
 import * as zod from 'zod/mini';
 
 export const fiatAmountCurrencyRegExp = new RegExp('^[A-Z]{3}$');
+export const fiatAmountExponentMin = 0;
+export const fiatAmountExponentMax = 4;
+
 export const fiatAmountMinorRegExp = new RegExp('^-?[0-9]+$');
 
 export const FiatAmount = /*#__PURE__*/ zod.object({
   "currency": /*#__PURE__*/ zod.string().check(/*#__PURE__*/ zod.regex(fiatAmountCurrencyRegExp)).check(/*#__PURE__*/ zod.describe('ISO 4217')),
+  "exponent": /*#__PURE__*/ zod.int().check(/*#__PURE__*/ zod.gte(fiatAmountExponentMin)).check(/*#__PURE__*/ zod.lte(fiatAmountExponentMax)),
   "minor": /*#__PURE__*/ zod.string().check(/*#__PURE__*/ zod.regex(fiatAmountMinorRegExp))
-}).check(/*#__PURE__*/ zod.describe('An amount in the currency\'s minor unit, as an integer string (D-08).'))
+}).check(/*#__PURE__*/ zod.describe('An amount as an integer string in the minor unit the server counts in, with that unit\'s exponent: minor 123456 with exponent 2 is 1234.56. Currency tables disagree on the exponent, so it travels with the amount (D-08, CC-06).'))
 
 export type FiatAmount = zod.input<typeof FiatAmount>;
 export type FiatAmountOutput = zod.output<typeof FiatAmount>;

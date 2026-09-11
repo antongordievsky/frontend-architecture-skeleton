@@ -12,6 +12,9 @@ export const transactionPageItemsItemOneAmountDecimalsMax = 36;
 
 export const transactionPageItemsItemOneAmountBaseUnitsRegExp = new RegExp('^-?[0-9]+$');
 export const transactionPageItemsItemOneValueCurrencyRegExp = new RegExp('^[A-Z]{3}$');
+export const transactionPageItemsItemOneValueExponentMin = 0;
+export const transactionPageItemsItemOneValueExponentMax = 4;
+
 export const transactionPageItemsItemOneValueMinorRegExp = new RegExp('^-?[0-9]+$');
 
 export const transactionPageItemsItemTwoAmountDecimalsMin = 0;
@@ -19,6 +22,9 @@ export const transactionPageItemsItemTwoAmountDecimalsMax = 36;
 
 export const transactionPageItemsItemTwoAmountBaseUnitsRegExp = new RegExp('^-?[0-9]+$');
 export const transactionPageItemsItemTwoValueCurrencyRegExp = new RegExp('^[A-Z]{3}$');
+export const transactionPageItemsItemTwoValueExponentMin = 0;
+export const transactionPageItemsItemTwoValueExponentMax = 4;
+
 export const transactionPageItemsItemTwoValueMinorRegExp = new RegExp('^-?[0-9]+$');
 
 export const transactionPageItemsItemThreeSoldDecimalsMin = 0;
@@ -31,6 +37,9 @@ export const transactionPageItemsItemThreeBoughtDecimalsMax = 36;
 
 export const transactionPageItemsItemThreeBoughtBaseUnitsRegExp = new RegExp('^-?[0-9]+$');
 export const transactionPageItemsItemThreeValueCurrencyRegExp = new RegExp('^[A-Z]{3}$');
+export const transactionPageItemsItemThreeValueExponentMin = 0;
+export const transactionPageItemsItemThreeValueExponentMax = 4;
+
 export const transactionPageItemsItemThreeValueMinorRegExp = new RegExp('^-?[0-9]+$');
 
 export const TransactionPage = /*#__PURE__*/ zod.object({
@@ -45,8 +54,9 @@ export const TransactionPage = /*#__PURE__*/ zod.object({
 }).check(/*#__PURE__*/ zod.describe('An amount in the asset\'s smallest unit, as an integer string; decimals travel with it (D-08).')),
   "value": /*#__PURE__*/ zod.object({
   "currency": /*#__PURE__*/ zod.string().check(/*#__PURE__*/ zod.regex(transactionPageItemsItemOneValueCurrencyRegExp)).check(/*#__PURE__*/ zod.describe('ISO 4217')),
+  "exponent": /*#__PURE__*/ zod.int().check(/*#__PURE__*/ zod.gte(transactionPageItemsItemOneValueExponentMin)).check(/*#__PURE__*/ zod.lte(transactionPageItemsItemOneValueExponentMax)),
   "minor": /*#__PURE__*/ zod.string().check(/*#__PURE__*/ zod.regex(transactionPageItemsItemOneValueMinorRegExp))
-}).check(/*#__PURE__*/ zod.describe('An amount in the currency\'s minor unit, as an integer string (D-08).'))
+}).check(/*#__PURE__*/ zod.describe('An amount as an integer string in the minor unit the server counts in, with that unit\'s exponent: minor 123456 with exponent 2 is 1234.56. Currency tables disagree on the exponent, so it travels with the amount (D-08, CC-06).'))
 }),/*#__PURE__*/ zod.object({
   "kind": /*#__PURE__*/ zod.literal("withdrawal"),
   "id": /*#__PURE__*/ zod.string(),
@@ -58,8 +68,9 @@ export const TransactionPage = /*#__PURE__*/ zod.object({
 }).check(/*#__PURE__*/ zod.describe('An amount in the asset\'s smallest unit, as an integer string; decimals travel with it (D-08).')),
   "value": /*#__PURE__*/ zod.object({
   "currency": /*#__PURE__*/ zod.string().check(/*#__PURE__*/ zod.regex(transactionPageItemsItemTwoValueCurrencyRegExp)).check(/*#__PURE__*/ zod.describe('ISO 4217')),
+  "exponent": /*#__PURE__*/ zod.int().check(/*#__PURE__*/ zod.gte(transactionPageItemsItemTwoValueExponentMin)).check(/*#__PURE__*/ zod.lte(transactionPageItemsItemTwoValueExponentMax)),
   "minor": /*#__PURE__*/ zod.string().check(/*#__PURE__*/ zod.regex(transactionPageItemsItemTwoValueMinorRegExp))
-}).check(/*#__PURE__*/ zod.describe('An amount in the currency\'s minor unit, as an integer string (D-08).'))
+}).check(/*#__PURE__*/ zod.describe('An amount as an integer string in the minor unit the server counts in, with that unit\'s exponent: minor 123456 with exponent 2 is 1234.56. Currency tables disagree on the exponent, so it travels with the amount (D-08, CC-06).'))
 }),/*#__PURE__*/ zod.object({
   "kind": /*#__PURE__*/ zod.literal("trade"),
   "id": /*#__PURE__*/ zod.string(),
@@ -76,8 +87,9 @@ export const TransactionPage = /*#__PURE__*/ zod.object({
 }).check(/*#__PURE__*/ zod.describe('An amount in the asset\'s smallest unit, as an integer string; decimals travel with it (D-08).')),
   "value": /*#__PURE__*/ zod.object({
   "currency": /*#__PURE__*/ zod.string().check(/*#__PURE__*/ zod.regex(transactionPageItemsItemThreeValueCurrencyRegExp)).check(/*#__PURE__*/ zod.describe('ISO 4217')),
+  "exponent": /*#__PURE__*/ zod.int().check(/*#__PURE__*/ zod.gte(transactionPageItemsItemThreeValueExponentMin)).check(/*#__PURE__*/ zod.lte(transactionPageItemsItemThreeValueExponentMax)),
   "minor": /*#__PURE__*/ zod.string().check(/*#__PURE__*/ zod.regex(transactionPageItemsItemThreeValueMinorRegExp))
-}).check(/*#__PURE__*/ zod.describe('An amount in the currency\'s minor unit, as an integer string (D-08).'))
+}).check(/*#__PURE__*/ zod.describe('An amount as an integer string in the minor unit the server counts in, with that unit\'s exponent: minor 123456 with exponent 2 is 1234.56. Currency tables disagree on the exponent, so it travels with the amount (D-08, CC-06).'))
 })])),
   "nextCursor": /*#__PURE__*/ zod.optional(/*#__PURE__*/ zod.string())
 })

@@ -54,11 +54,18 @@ components:
         decimals: { type: integer, minimum: 0, maximum: 36 }
         baseUnits: { type: string, pattern: "^-?[0-9]+$" }
     FiatAmount:
-      description: An amount in the currency's minor unit, as an integer string (D-08).
+      description: >-
+        An amount as an integer string in the minor unit the server counts in, with that unit's exponent:
+        minor 123456 with exponent 2 is 1234.56. Currency tables disagree on the exponent, so it travels
+        with the amount (D-08, CC-06).
       type: object
-      required: [currency, minor]
+      required: [currency, exponent, minor]
       properties:
         currency: { type: string, pattern: "^[A-Z]{3}$", description: ISO 4217 }
+        exponent:
+          type: integer
+          minimum: 0
+          maximum: 4
         minor: { type: string, pattern: "^-?[0-9]+$" }
     TransactionKind:
       type: string

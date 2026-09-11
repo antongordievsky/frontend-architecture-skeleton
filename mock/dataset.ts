@@ -47,7 +47,11 @@ export const generateTransactions = (seed: number, count: number): readonly Tran
     const digits = Array.from({ length }, () => Math.floor(random() * 10)).join('')
     return { asset, decimals, baseUnits: digits.replace(/^0+(?=\d)/, '') }
   }
-  const value = () => ({ currency: 'EUR', minor: String(Math.floor(random() * 10_000_000)) })
+  const value = () => ({
+    currency: 'EUR',
+    exponent: 2,
+    minor: String(Math.floor(random() * 10_000_000)),
+  })
   let time = LATEST
   return Array.from({ length: count }, (_, i): Transaction => {
     time -= 1_000 + Math.floor(random() * 6 * 3_600_000)
