@@ -319,7 +319,7 @@ Options are genuinely different approaches, and the company's own stack is alway
 | D-08 | How do we hold money so that no amount is ever silently wrong? | QR-1, QR-2, QR-3, QR-8, QR-9, QR-21, QR-24 | plan 04 |
 | D-04 | Where does the demo data come from, and how do we keep it out of what users download? | FR-3, QR-6, QR-11, C-2, QR-5, QR-8, QR-9, QR-24, QR-21 | plan 04 |
 | D-17 | How do people sign in, and what does the browser keep so that nobody can steal a session? (design for) | DR-2, QR-11, DR-3, DR-8 | plan 04 |
-| D-09 | Testing strategy and environments (unit, component/integration, e2e, browsers in Docker); proving tests fail — manual deliberate breaks vs mutation testing (input: Stryker 10.0.0 with a Vitest runner, measured 2026-09-10) | FR-6, QR-12, QR-22, QR-23 | plan 04 (first tests) |
+| D-09 | How do we know the product works, and that our tests would notice if it stopped? | FR-6, QR-12, QR-22, QR-23, QR-4, QR-8, QR-21, QR-24 | plan 04 (first tests) |
 | D-05 | Routing | FR-4, QR-3, QR-21 | plan 05 |
 | D-18 | Authorization model (design for, guard seam) | DR-3, QR-17 | plan 05 |
 | D-07 | UI foundation: kit, styling model, tokens | FR-5, QR-12, QR-21, QR-22 | plan 06 |
@@ -1427,6 +1427,165 @@ the sign-in providers and the backend's auth stack (the backend's choice); the m
   - *Growth path* — the first sign-in screen brings `/me`, the 401 reaction and sign-out, with the
     stand-in setting a cookie; React Native gets its own credentials part of the transport, with tokens
     in the platform's secure storage (DR-8).
+
+### D-09 — How do we know the product works, and that our tests would notice if it stopped?
+
+`Accepted` 2026-09-11 · needed by plan 04 · build now (fast tests and their proof in plan 04, browser tests
+with the first page in plan 07) · judged by FR-6, QR-12, QR-22, QR-23, QR-4, QR-8, QR-21, QR-24
+
+**What we are deciding.** Tests decide whether a change is safe to ship. Fast tests run on every commit
+and check the rules for money and the path data takes from the server to the screen. Slow tests open the
+real app in real browsers and check what a person sees, including someone using only a keyboard or a
+screen reader. Each kind costs setup and minutes. And a test that could never fail protects nothing, but
+looks as if it does. We decide which tools run which tests, where and when, and how we prove that each
+test would catch the fault it was written for. It is decided now because plan 04 writes the first tests.
+
+**Not decided here:** performance tests and their budgets (D-20); CI (D-11); visual regression (D-14).
+
+Fast tests — units, the data path, components. Which runner, and what stands in for the page:
+
+| Criterion | A — Vitest 5.0.0, the page simulated by jsdom 30.0.1, Testing Library | B — Vitest, happy-dom 20.14.3 | C — Vitest browser mode, a real Chromium | D — Playwright component testing (stories and galleries, stable since 1.62) | E — Jest 30.5.1 with jsdom | F — Cypress 16.0.0 component testing | G — Bun's built-in runner |
+|---|---|---|---|---|---|---|---|
+| D-13 tests run the code that ships | ✅ the component under test carried the compiler's `$[n]` slots | ✅ the same pipeline | ✅ | ✅ our own dev server builds the stories: "Playwright does not compile or serve anything" | ❌ "Jest is not supported by Vite": the compiler would need a second, Babel-only config | ❓ its own Vite integration, not run | ❌ no compiler output: Bun never reads `vite.config.ts` |
+| FR-6 the data path through the D-04 handler | ✅ 8 of 8 in 0.9 s: amounts; loading, 50 rows, error, empty through the real adapter, transport and query client | ❓ not run | ✅ | ⚠️ props must be "plain serializable data"; providers and the handler live inside each story | ⚠️ as A, over a second pipeline | ❓ | ⚠️ unit tests passed; `vi.unstubAllGlobals` does not exist |
+| Fidelity | ⚠️ simulated: no layout, no real focus order | ⚠️ as A | ✅ a real engine | ✅ the three real engines of the browser tests | ⚠️ as A | ✅ a real browser | ⚠️ needs a simulated page too |
+| QR-24 record | ✅ jsdom: six maintainers, one advisory (2022, withdrawn), 37 packages | ❌ five critical or high advisories 2024–2026, one a VM escape to code execution; one maintainer | ❌ `@vitest/browser`: three critical advisories in 2026 | ✅ none; the same package as the browser tests | ⚠️ no provenance; 238 packages | ⚠️ 146 packages, no provenance; `postinstall` downloads the app binary | ✅ nothing to add |
+| Cost | ✅ the image `check` already uses; about a second | ✅ | ❌ browsers wherever tests run | ⚠️ a gallery page and a story per scenario — Storybook's shape (D-14) | ⚠️ a second transform pipeline to keep in step | ❌ a 942 MB image; parallel runs through Cypress Cloud | ✅ fastest: 30 ms for the unit file |
+| Adoption, npm downloads in the week to 2026-09-09 | vitest 57.5 M, jsdom 53.3 M, Testing Library 31.4 M | 8.9 M | within vitest | 0.26 M (the older package) | 24.3 M | 3.6 M | — |
+| QR-21 the company's stack | ✅ Vitest, named in the posting | ✅ | ✅ | ✅ Playwright, named | ❌ | ❌ | ⚠️ Bun is their runtime, Vitest their runner |
+
+Browser tests — the production build in real engines (D-12):
+
+| Criterion | A — Playwright Test 1.62.1 | B — Cypress 16.0.0 | C — WebdriverIO 9.31.7 | D — Selenium WebDriver 4.49.0 | E — Puppeteer 25.10.0 | F — TestCafe 3.7.6 |
+|---|---|---|---|---|---|---|
+| QR-22 engines | ✅ Chromium, WebKit and Firefox in one run (measured) | ⚠️ Chrome family, Firefox and WebKit by its docs; its image carries Chrome, Firefox and Edge, no WebKit | ✅ any WebDriver browser, real Safari on a Mac | ✅ as C | ❌ Chrome and Firefox only | ❓ |
+| C-2 in Docker | ✅ Microsoft's image, 960 MB: 9 tests, three engines, 4.9 s (measured) | ✅ `cypress/included`, 942 MB (arm64) | ⚠️ browsers and drivers assembled by us | ⚠️ Selenium Grid images | ⚠️ `postinstall` downloads Chrome | ❓ |
+| QR-12 accessibility and keyboard | ✅ `@axe-core/playwright` found the two planted violations; Tab reached the button in all three engines | ⚠️ a community axe plugin, not run | ⚠️ an axe package, not run | ⚠️ as C | ⚠️ as C | ❓ |
+| Parallel runs, free | ✅ workers locally, shards in CI | ❌ parallelisation goes through Cypress Cloud | ✅ | ✅ through a Grid | ⚠️ it is an automation library; the runner is ours | ❓ |
+| QR-24 record | ✅ 3 packages, provenance, no install script; browsers come with the image | ⚠️ 146 packages, no provenance, a binary download on install | ⚠️ 233 packages with its CLI | ✅ 19 packages | ⚠️ a browser download on install | ❌ 361 packages, one maintainer |
+| Adoption, npm downloads in the week to 2026-09-09 | 33.9 M | 3.6 M | 1.4 M | 1.1 M | 6.3 M, mostly automation, not testing | 0.1 M |
+| QR-21 the company's stack | ✅ named in the posting | ❌ | ❌ | ❌ | ❌ | ❌ |
+
+How many tools — the author asked whether Playwright alone would do, rather than five testing packages:
+
+| Criterion | P1 — Vitest, jsdom and Testing Library for fast tests; Playwright for browser tests | P2 — Playwright alone: Node tests, components and browser tests | P3 — Vitest for logic in Node; Playwright for everything that renders |
+|---|---|---|---|
+| Testing packages, before axe and Stryker | ⚠️ five | ✅ one | ✅ two |
+| QR-21 the company's stack | ⚠️ both named tools, plus jsdom and Testing Library, which the posting does not name | ⚠️ drops Vitest, which it names | ✅ exactly the two it names |
+| Units and the data path | ✅ 0.9 s | ✅ 6 of 6 in 0.59 s in Node, `bigint` and `.ts` imports included | ✅ as P1 |
+| Components | ⚠️ a simulated page, but it runs in `check` anywhere | ✅ real engines; ⚠️ needs browsers, which `check`'s image lacks | ✅ / ⚠️ as P2 |
+| Mutation testing | ✅ the Vitest runner, with per-test coverage: 2.7 s | ⚠️ no Playwright runner; the command runner took 10.9 s and 59 s of CPU against 8.5 s, cannot say which test killed a mutant, and runs the whole suite per mutant | ✅ as P1 |
+| Ways to test UI | ❌ two: Testing Library queries and Playwright locators | ✅ one | ✅ one |
+| Familiar to a new hire | ✅ | ⚠️ unit tests in Playwright are rare | ✅ |
+
+Proving that tests catch what they claim to (QR-23). What teams at scale do:
+- *Coverage gates* are the most common. Google's guidance calls 60 % acceptable, 75 % commendable and
+  90 % exemplary, and warns that coverage shows code was run, not that its behaviour was checked. Codecov's
+  patch status measures only the lines a change touches.
+- *Mutation testing on the change, at review* is Google's model: mutants only on changed, covered lines,
+  shown to the author as review comments, for more than 24 000 developers on more than 1 000 projects.
+  Over six years and almost 15 million mutants, developers who saw them wrote more tests, and tests that
+  left fewer mutants alive. Mutating a whole large code base is, in the paper's words, "impracticable".
+- *Meta's ACH* (2025) has a language model write mutants aimed at one concern, then the tests that kill
+  them: 10 795 classes, 9 095 mutants, 571 tests.
+- *Test first* — a test seen failing before the code exists; *property-based tests* for invariants; and
+  *contract tests* where teams meet, which our generated schema and the dataset test already cover
+  locally (D-03, D-04).
+
+| Criterion | A — a deliberate break per new test, recorded in the plan's log (today's rule) | B — a coverage threshold in `check` (`@vitest/coverage-v8`) | C — mutation testing of all code in `check` | D — A, plus mutation testing of the code each plan changed, at its wrap-up (Stryker, incremental) | E — D, plus property-based tests for money (`fast-check`) |
+|---|---|---|---|---|---|
+| Shows an assertion checks behaviour | ⚠️ only for the breaks someone imagines | ❌ counts lines run, not checked | ✅ | ✅ on `amount.ts`: 38 mutants, 2 survived, 3 not covered — an untested `decimals-mismatch` branch and an unused `parseUnits` | ✅ and feeds inputs nobody thought of |
+| What teams at scale do | ✅ test-first, and review asking "does it fail without the change?" | ✅ the usual gate | ❌ "impracticable" at scale (Google) | ✅ Google's model: the change, at review | ✅ where invariants matter |
+| Cost | ✅ none | ⚠️ 20 packages, and a number to argue about | ❌ grows with the code, on every commit | ⚠️ 161 development packages; seconds per plan today | ⚠️ as D, plus `fast-check` (one maintainer; 4.10.0 released today, inside the quarantine) |
+| Runs where pre-commit runs `check` (the agent's sandbox) | ✅ | ✅ | ❌ Stryker listens on a port: `EPERM` in the sandbox, so every agent commit would fail | ✅ outside `check`, as Docker runs | ✅ as D |
+
+- **Decision:** P3 — Vitest for logic, in Node; Playwright for everything that renders, in real engines;
+  every test proven by a deliberate break, and the code each plan changed mutation-tested at its wrap-up —
+  Google's model, at our scale. Nothing is tested on a simulated page: jsdom and Testing Library are not
+  installed. The author's question — one tool instead of five — moved this from P1 to P3.
+  - *Logic tests (plan 04)* — Vitest 5.0.0 in Node, with no page: files `*.test.ts` beside the code they
+    test, inside the module. Unit tests for `domain`; integration tests for `api` through the D-04 handler plugged into
+    `fetch`, so the real adapter, transport and query client run. `check` runs `vitest run` after
+    typecheck. The type-level test stays with `tsc` (D-08).
+  - *Components (plans 06–07)* — Playwright's component testing. A story per scenario is served by our
+    own Vite dev server, so the React Compiler runs, and it is tested in the same engines as the pages.
+    Its stories and gallery are Storybook's shape, so D-14 decides whether one set of stories serves both.
+    Component tests need browsers, which `check`'s image lacks. Whether they run in pre-commit on the
+    Playwright image, or only in the browser profile, is settled with the first component.
+  - *Browser tests (plan 07)* — `@playwright/test` against `web-prod` (D-12), in their own compose profile
+    on Microsoft's image, pinned to the same version. Chromium, WebKit and Firefox: measured, the third
+    engine costs seconds. `@axe-core/playwright` runs on every page test, and the transactions page gets
+    a keyboard-only pass (QR-12).
+  - *Layers* — tests obey the layer map. The rule that refuses an import leaving `src/` (D-04) lets a test
+    file reach `mock/` and nothing else, with a fixture case for each.
+  - *Proof* — every new test is still proven by a deliberate break, recorded in the log. At each wrap-up,
+    Stryker in incremental mode mutates what the plan changed in `domain`, `api` and `mock`, outside
+    `check`. Each surviving mutant is killed by a test or recorded with its reason, and the score goes into
+    the log. There is no coverage threshold: coverage counts lines run, and the mutation score says more.
+- **Evidence:** measured and read 2026-09-11, on the D-03, D-04 and D-08 spike code, with the app's Vite
+  8.3.0 config, Node 24.21.0, Bun 1.4.2.
+  - *Vitest 5.0.0 with jsdom 30.0.1* — 8 of 8 passed in 0.9 s (1.2 s wall). The first run failed one test
+    for the right reason: the compiler check looked for a helper name the build renames. The component's
+    source then showed `$[n]` slots.
+  - *Bun's runner* — the unit file passed in 30 ms. In the component file every test failed:
+    `vi.unstubAllGlobals` is not a function, and the component had no compiler output.
+  - *Playwright 1.62.1 in `mcr.microsoft.com/playwright:v1.62.1-noble`* — 9 of 9 in 4.9 s across Chromium,
+    WebKit and Firefox:
+    - Tab focused the button in each engine;
+    - axe reported nothing on a clean page, and reported `image-alt` and `button-name` on a page broken on
+      purpose;
+    - all three engines formatted `1234567.123456789012345678` exactly, rounded half-even
+      (`0.125 → 0.12`, `0.135 → 0.14`) and gave EUR 2, JPY 0 and KWD 3 minor digits. That settles D-08's
+      open risk for these builds of WebKit and Firefox.
+  - *Playwright component testing* — the 1.62 release notes move it to stories and galleries; the
+    `mount` fixture is in 1.62.1's types; the docs say components "are built and served by your own dev
+    server".
+  - *Stryker 10.0.0, Vitest runner* — 38 mutants on `amount.ts` in 2.7 s: score 86.84 %, 33 killed, 2
+    survived, 3 without coverage. In the sandbox it stopped at `listen EPERM`, so it ran outside.
+    Incremental mode stores the last report and re-runs only mutants whose code or tests changed.
+  - *Playwright alone (P2)* — Playwright Test ran the unit and data-path tests in Node with no browser: 6 of
+    6 in 0.59 s (1.1 s wall). Stryker has runners for Vitest, Jest, Mocha, Karma, Jasmine, Tap and
+    Cucumber, and none for Playwright. Its command runner over Playwright reached the same 86.84 % in
+    10.9 s wall and 59 s CPU, against 2.7 s and 8.5 s with the Vitest runner. Without coverage it reported
+    the 3 uncovered mutants as survivors.
+  - *Registry and advisories:*
+    - `vitest` 5.0.0 (2026-09-03, five maintainers, provenance; peer `vite ^6.4 || ^7 || ^8`);
+    - `jsdom` 30.0.1 (2026-07-29);
+    - `happy-dom` 20.14.3 (2026-09-09, one maintainer), with GHSA-37j7-fg3j-429f (critical, VM escape)
+      among five;
+    - `@vitest/browser`: GHSA-p63j-vcc4-9vmv, GHSA-g8mr-85jm-7xhm, GHSA-2h32-95rg-cppp, all critical;
+    - `@playwright/test` 1.63.0 (2026-09-04) is inside the 7-day quarantine until today's end, and
+      1.62.1 (2026-07-30) is past it;
+    - `cypress` 16.0.0 (two maintainers, no provenance, 146 packages); `cypress/included` 16.0.0 is
+      942 MB for arm64;
+    - `webdriverio` 9.31.7, `selenium-webdriver` 4.49.0, `puppeteer` 25.10.0 (one advisory, 2020),
+      `testcafe` 3.7.6 (one maintainer, 361 packages), `jest` 30.5.1 (no provenance, 238 packages);
+    - `@stryker-mutator/core` 10.0.0 (161 packages); `fast-check` 4.10.0; `@axe-core/playwright` 4.13.0;
+    - download counts from `api.npmjs.org`, the week 2026-09-03 to 2026-09-09.
+  - *Sources:* Jest's getting-started guide (Vite); Cypress's cross-browser guide; Playwright's component
+    testing guide and release notes; Google Testing Blog, "Code Coverage Best Practices" (2020);
+    Petrović et al., "Practical Mutation Testing at Scale: A view from Google" (TSE 2021) and "Does
+    mutation testing improve testing practices?" (ICSE 2021); Foster et al., "Mutation-Guided LLM-based
+    Test Generation at Meta" (FSE 2025); StrykerJS's incremental-mode docs; Codecov's commit-status docs.
+- **Wrong if:**
+  - a wrap-up's mutation run grows past a few minutes, or its survivors are mostly noise — then back to
+    A alone;
+  - component tests in real browsers make the loop too slow, or keeping them out of pre-commit lets
+    component regressions through — then jsdom and Testing Library for components (P1);
+  - Linux WebKit in Docker diverges from Safari on a user's device — then a device cloud, with CI (D-11);
+  - three engines push the browser suite past D-20's time budget — then Firefox leaves first.
+- **Where it leads:**
+  - *Gains* — two tools, both the company's; logic tests run in about a second; the data path is tested end to
+    end without a server; nothing is tested on a simulated page — components and pages run the compiled
+    code in real engines; browser tests see the production build in three engines, with accessibility
+    checked on every page; each test's proof is on record, and a tool finds what the author did not think
+    to break.
+  - *Costs* — component tests need browsers, so they may run later than pre-commit; a 960 MB image for
+    browser tests; two runners with two configs; Stryker's 161 development packages, and a mutation run
+    per plan to answer.
+  - *Growth path* — the mutation run moves into CI on each change, commenting on survivors as Google's
+    does (D-11); property-based tests with `fast-check` when D-08's arithmetic grows beyond addition;
+    jsdom for a component test only if a real engine proves too slow for it.
 
 ## Course corrections
 
