@@ -20,6 +20,34 @@
     "react/jsx-key": "error",
     "react/no-danger": "error",
     "react/only-export-components": ["error", { "allowConstantExport": true }],
+    "react/forbid-elements": [
+      "error",
+      {
+        "forbid": [
+          {
+            "element": "a",
+            "message": "use RouterLink from components/, or Link from ui/ (FR-5, D-07)"
+          },
+          { "element": "button", "message": "use Button from ui/ (FR-5, D-07)" },
+          {
+            "element": "input",
+            "message": "raw controls live in ui/: use or add a part (FR-5, D-07)"
+          },
+          {
+            "element": "select",
+            "message": "raw controls live in ui/: use or add a part (FR-5, D-07)"
+          },
+          {
+            "element": "textarea",
+            "message": "raw controls live in ui/: use or add a part (FR-5, D-07)"
+          },
+          {
+            "element": "dialog",
+            "message": "raw controls live in ui/: use or add a part (FR-5, D-07)"
+          }
+        ]
+      }
+    ],
 
     "jsx-a11y/alt-text": "error",
     "jsx-a11y/anchor-ambiguous-text": "error",
@@ -97,6 +125,10 @@
     ]
   },
   "overrides": [
+    {
+      "files": ["src/ui/**", "**/*.story.tsx"],
+      "rules": { "react/forbid-elements": "off" }
+    },
     {
       "files": ["src/domain/**"],
       "rules": {

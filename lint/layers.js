@@ -58,6 +58,16 @@ const locate = (file, src, zones) => {
   return { layer: top, parts }
 }
 
+// D-07, FR-5: the kit's library belongs to ui; the rest of the code uses the parts built on it.
+const KIT_LIBRARY =
+  /^(react-aria-components|react-aria|react-stately)(\/|$)|^@react-(aria|stately)\//
+// D-05: links inside the app are RouterLink, the router's Link drawn by the kit's; only it takes the router's.
+const ROUTER = '@tanstack/react-router'
+const ROUTER_LINK = 'components/RouterLink'
+// D-14: a story is for the gallery and for tests; nothing that ships imports one.
+const isStory = (at) => at.parts[at.parts.length - 1].endsWith('.story')
+const isStoryOrSpec = (file) => /\.(story|spec)\.[cm]?[jt]sx?$/.test(file)
+
 const isKnown = (at) => at.layer === 'zone' || at.layer in ALLOWED
 // D-03: the generated client is api's own; the rest of the code reaches the server through an adapter.
 const isGenerated = (at) => at.layer === 'api' && at.parts[1] === 'generated'
@@ -151,8 +161,23 @@ export default {
           let target
           if (source.startsWith('@/')) target = path.resolve(src, source.slice(2))
           else if (source.startsWith('.')) target = path.resolve(path.dirname(file), source)
-          else return
+          else {
+            if (KIT_LIBRARY.test(source) && from.layer !== 'ui') {
+              report(
+                node,
+                `${source} is the kit's library: only ui/ imports it; use a part from ui/`,
+              )
+            }
+            return
+          }
           const to = locate(target, src, zones)
+          if (to && isStory(to) && !isStoryOrSpec(file)) {
+            report(
+              node,
+              'a story is for the gallery and its tests: code that ships never imports one',
+            )
+            return
+          }
           if (!to) {
             // D-04: nothing in src/ reaches outside it, so the stand-in never enters the bundle.
             // A test file may use the stand-in, and only it.
@@ -164,9 +189,25 @@ export default {
           const message = verdict(from, to)
           if (message) report(node, message)
         }
+        const routerLink = (node) => {
+          if (node.source?.value !== ROUTER || from.module === ROUTER_LINK) return
+          for (const specifier of node.specifiers ?? []) {
+            const name = specifier.imported?.name ?? specifier.local?.name
+            if (name === 'Link') {
+              report(specifier, `the router's Link is drawn by ${ROUTER_LINK}: import RouterLink`)
+            }
+          }
+        }
         return {
-          ImportDeclaration: (node) => check(node, node.source.value),
-          ExportNamedDeclaration: (node) => node.source && check(node, node.source.value),
+          ImportDeclaration: (node) => {
+            check(node, node.source.value)
+            routerLink(node)
+          },
+          ExportNamedDeclaration: (node) => {
+            if (!node.source) return
+            check(node, node.source.value)
+            routerLink(node)
+          },
           ExportAllDeclaration: (node) => check(node, node.source.value),
           TSImportType: (node) => check(node, literal(node.source)),
           TSImportEqualsDeclaration: (node) =>

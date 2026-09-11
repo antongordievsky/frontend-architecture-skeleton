@@ -3,3 +3,5 @@ import { Card } from '@/ui/Card'
 import { DashboardPage } from '@/app/pages/Dashboard'
 
 export const PageHeader = [Card, DashboardPage]
+// expect: the router's Link is drawn by components/RouterLink
+export { Link } from '@tanstack/react-router'
