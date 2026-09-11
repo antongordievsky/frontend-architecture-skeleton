@@ -1,7 +1,18 @@
 import { QueryClient } from '@tanstack/react-query'
 import { afterEach, describe, expect, test, vi } from 'vitest'
+import { asFetch, createHandler } from '../../mock/handler.ts'
 import { transactionsQuery } from './transactions.ts'
 import { ApiError } from './transport.ts'
+
+// Integration (D-09): the real adapter, transport and query client, over the stand-in (D-04).
+test('reads the first page of the seeded dataset as domain transactions', async () => {
+  vi.stubGlobal('fetch', asFetch(createHandler()))
+  const page = await new QueryClient().fetchQuery(transactionsQuery())
+  expect(page.items).toHaveLength(50)
+  expect(page.nextCursor).toBe('50')
+  const first = page.items[0]
+  expect(typeof (first?.kind === 'trade' ? first.sold.units : first?.amount.units)).toBe('bigint')
+})
 
 const respond = (body: unknown) =>
   vi.stubGlobal(
