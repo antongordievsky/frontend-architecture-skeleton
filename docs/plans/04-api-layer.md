@@ -279,7 +279,8 @@ Vite 8.3.0, Bun 1.4.2, Node 24.21.0.
   - the drift script's fixed paths;
   - the lockfile: registry sources, no install scripts.
 - `/code-review` — four findings. Three are fixed here; one waits for the author.
-  1. *Some fiat amounts would display 100× or 1000× too large* (medium). **Open: needs the author.**
+  1. *Some fiat amounts would display 100× or 1000× too large* (medium). **Decided after the wrap-up:** the author chose the digits travelling
+     with each amount — D-08 amended, CC-06; the display digits are D-27, open.
      - The contract sends `minor` in the ISO 4217 minor unit. `formatAmount` takes the fraction digits
        from `Intl`, which follows CLDR, and the two tables disagree.
      - Measured on Node 24.21 (ICU 78.3, CLDR 48): HUF, IDR, ALL, LAK, LBP, IRR and MGA get 0 digits

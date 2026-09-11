@@ -316,7 +316,8 @@ Options are genuinely different approaches, and the company's own stack is alway
 | D-26 | When the agent starts a container, how much of the machine can that container reach? | DR-6, QR-11, QR-7, QR-8, C-2, FR-6 | deferred by the author — not what the take-home is about |
 | D-16 | How do we divide the code so everyone knows where things go, and the parts of the product stay apart? | FR-1, FR-2, DR-1, DR-4, DR-8, QR-8, QR-17, QR-21, QR-23 | plan 03 |
 | D-03 | When the server sends data, how do we make sure it is right before a screen shows it? (the generator itself moved to D-24, CC-01) | FR-3, QR-1, QR-2, QR-5, QR-9, DR-2, DR-5, DR-8, QR-8, QR-24, QR-21 | plan 04 |
-| D-08 | How do we hold money so that no amount is ever silently wrong? | QR-1, QR-2, QR-3, QR-8, QR-9, QR-21, QR-24 | plan 04 |
+| D-08 | How do we hold money so that no amount is ever silently wrong? (amended: the minor digits travel with the amount, CC-06) | QR-1, QR-2, QR-3, QR-8, QR-9, QR-21, QR-24 | plan 04 |
+| D-27 | How many digits does a screen show for each currency — every digit of the unit (`HUF 1,234.56`), or the local convention (`1235 Ft`)? A domain question, split from D-08 (CC-06) | QR-2, QR-21 | deferred by the author — needs domain research; until then every digit is shown and nothing is rounded (QR-2) |
 | D-04 | Where does the demo data come from, and how do we keep it out of what users download? | FR-3, QR-6, QR-11, C-2, QR-5, QR-8, QR-9, QR-24, QR-21 | plan 04 |
 | D-17 | How do people sign in, and what does the browser keep so that nobody can steal a session? (design for) | DR-2, QR-11, DR-3, DR-8 | plan 04 |
 | D-09 | How do we know the product works, and that our tests would notice if it stopped? | FR-6, QR-12, QR-22, QR-23, QR-4, QR-8, QR-21, QR-24 | plan 04 (first tests) |
@@ -1220,6 +1221,17 @@ own brings nothing we do not use. It is decided now because the first page shows
     value.
   - *Formatting* — at the render boundary. `formatAmount` builds an exact decimal string and hands it to a
     cached `Intl.NumberFormat`; a currency's minor digits come from `Intl`, so there is no currency table.
+    - *Amended 2026-09-11 (CC-06), agreed by the author:* the minor digits travel with every fiat amount,
+      as `decimals` does with crypto. The contract's `FiatAmount` gains a required `exponent`, and
+      `FiatAmount<C>` becomes `{ kind: 'fiat', currency, exponent, minor: bigint }`. The server that
+      produced `minor` states its unit, so the frontend holds no table of currency digits, neither
+      `Intl`'s nor its own; `Intl` only groups digits and places the symbol. Rejected:
+      - our own ISO 4217 table — it can silently disagree with the backend's, and Ruby's `money`, the
+        likely one, already does (CC-06);
+      - keeping `Intl`, with the backend sending its units — the backend would round away fractions, and
+        the stored unit would depend on the browser's ICU version.
+    - How many digits a screen shows is D-27, open. Until it is decided, `formatAmount` shows every digit
+      of the unit and rounds nothing (QR-2).
   - *The type-level test (QR-1)* — a file of `@ts-expect-error` lines that `tsc` checks in `check`, so it
     needs no test runner. BigInt literals stay in `domain` (D-13).
 - **Evidence:** measured 2026-09-11 on TypeScript 7.0.2 under our strict flags, Node 24.21.0, Bun 1.4.2.
@@ -1244,7 +1256,9 @@ own brings nothing we do not use. It is decided now because the first page shows
   - exact string formatting misbehaves on the second browser engine (QR-22) — then `formatAmount` groups
     digits itself;
   - the backend identifies assets by ticker only — then the asset id becomes ticker plus chain, agreed in
-    the contract.
+    the contract;
+  - the backend cannot attach the exponent to each fiat amount (amendment, CC-06) — then a table copied
+    from the backend's, with a contract test that compares the two.
 - **Where it leads:**
   - *Gains* — an amount cannot lose a digit, or be added to the wrong asset, without a compile error or
     a typed failure; the cache holds plain data, so unchanged rows keep their identity and memoised rows
@@ -1671,6 +1685,35 @@ the correction is recorded here, dated, with what triggered it. This is the chai
 - **Lesson:** a pinned version is a measurement with a date. `bun audit` sees only the global database,
   and a project's own advisories reach it days later. A tool whose recent releases are security fixes is
   checked at its source as well.
+
+### CC-06 — A currency's minor digits were assumed to be one fact, the same everywhere · 2026-09-11
+
+- **Assumed:** D-08 took a currency's minor digits from `Intl`, "so there is no currency table". The
+  contract said only "the currency's minor unit", without naming whose table. D-08's spike checked EUR 2,
+  JPY 0 and KWD 3, where every table agrees.
+- **Found:** at plan 04's code review, then measured. There are three tables, and they disagree pairwise:
+
+  | Currency | ISO 4217 | `Intl` (CLDR) | Ruby `money` |
+  |---|---|---|---|
+  | HUF | 2 | 0 | 0 (`subunit_to_unit` 1) |
+  | IDR | 2 | 0 | 2 (100) |
+  | IQD | 3 | 0 | 3 (1000) |
+
+  - `Intl` also gives 0 where ISO says 2 for ALL, LAK, LBP, IRR and MGA.
+  - A backend on Ruby's `money` sending `{ IDR, minor: 123456 }` (Rp 1,234.56) would show as
+    `IDR 123,456`: 100 times too large, and no check fails.
+  - With the right unit, `Intl`'s default still rounds: HUF 1234.56 prints `HUF 1,235`, a rounding QR-2
+    allows only as a named step.
+  - Sources: Node 24.21.0 with ICU 78.3 and CLDR 48; `datasets/currency-codes` `codes-all.csv`, last
+    changed 2026-02-01; RubyMoney `config/currency_iso.json` on `main`; all read on 2026-09-11.
+- **Changed:**
+  - D-08 is amended: the minor digits travel with every fiat amount (`exponent`), as `decimals` does with
+    crypto. The frontend holds no currency table.
+  - How many digits a screen shows became D-27, deferred by the author as a domain question. Until then
+    every digit is shown.
+  - The code follows in its own plan, before any screen formats fiat (plan 07).
+- **Lesson:** a unit left implicit is a unit two sides can disagree on. Test a lookup on the cases where
+  its sources disagree, not only on the ones where they all agree.
 
 ---
 
