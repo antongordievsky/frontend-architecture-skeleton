@@ -58,6 +58,9 @@ const locate = (file, src, zones) => {
 }
 
 const isKnown = (at) => at.layer === 'zone' || at.layer in ALLOWED
+// D-03: the generated client is api's own; the rest of the code reaches the server through an adapter.
+const isGenerated = (at) => at.layer === 'api' && at.parts[1] === 'generated'
+const isTestFile = (file) => /\.test\.[cm]?[jt]sx?$/.test(file)
 const isBarrel = (to) => to.rest.length === 0 || (to.rest.length === 1 && to.rest[0] === 'index')
 const isZoneRoot = (at) =>
   at.layer === 'zone' &&
@@ -90,6 +93,9 @@ const verdict = (from, to) => {
   if (from.module && from.module === to.module) return undefined
   if (to.layer === 'zone') return intoZone(from, to)
   if (to.module && !isBarrel(to)) return `${to.module} is private: import it through its index.ts`
+  if (isGenerated(to) && from.layer !== 'api') {
+    return 'api/generated is private to api: import the resource adapter instead'
+  }
   if (!ALLOWED[from.layer].includes(to.layer)) return `${from.layer} may not import ${to.layer}`
   return undefined
 }
@@ -124,6 +130,7 @@ export default {
         const options = context.options[0] ?? {}
         const zones = new Set(options.zones ?? [])
         const src = real(path.resolve(ROOT, options.src ?? 'src'))
+        const mock = path.join(path.dirname(src), 'mock')
         const file = real(context.filename)
         const from = locate(file, src, zones)
         if (!from) return {}
@@ -145,7 +152,15 @@ export default {
           else if (source.startsWith('.')) target = path.resolve(path.dirname(file), source)
           else return
           const to = locate(target, src, zones)
-          const message = to && verdict(from, to)
+          if (!to) {
+            // D-04: nothing in src/ reaches outside it, so the stand-in never enters the bundle.
+            // A test file may use the stand-in, and only it.
+            if (!(isTestFile(file) && target.startsWith(mock + path.sep))) {
+              report(node, 'src/ may not import from outside it: only a test file may reach mock/')
+            }
+            return
+          }
+          const message = verdict(from, to)
           if (message) report(node, message)
         }
         return {
