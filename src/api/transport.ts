@@ -23,27 +23,37 @@ export type ErrorType<_Body> = ApiError
 // cookie goes to this site only. `include` would send it to any origin a wrong base URL named (D-17).
 const BASE_URL = '/api'
 
+// Boxed, so that a JSON `null` stays distinct from text that is not JSON at all.
+const parseJson = (text: string): { readonly value: unknown } | undefined => {
+  try {
+    return { value: JSON.parse(text) }
+  } catch {
+    return undefined
+  }
+}
+
 export const transport = async <T>(url: string, init: RequestInit = {}): Promise<T> => {
   // A cancelled request is not a failure: the query library expects its own AbortError back.
   const cancelled = () => init.signal?.aborted === true
   let response: Response
+  let text: string
   try {
     response = await fetch(`${BASE_URL}${url}`, { ...init, credentials: 'same-origin' })
+    // Read in full before judging it: a connection that drops mid-body is a network failure, not bad data.
+    text = await response.text()
   } catch (cause) {
     if (cancelled()) throw cause
     throw new ApiError({ kind: 'network', cause })
   }
-  let body: unknown
-  try {
-    body = response.headers.get('content-type')?.includes('json')
-      ? await response.json()
-      : undefined
-  } catch (cause) {
-    if (cancelled()) throw cause
+  const body = response.headers.get('content-type')?.includes('json')
+    ? parseJson(text)
+    : { value: undefined }
+  // A failed response keeps its status whatever its body, so a gateway's empty 503 is still retried.
+  if (!response.ok) throw new ApiError({ kind: 'http', status: response.status, body: body?.value })
+  if (body === undefined) {
     throw new ApiError({ kind: 'contract', issues: ['The response body is not valid JSON'] })
   }
-  if (!response.ok) throw new ApiError({ kind: 'http', status: response.status, body })
   // The generated call declares T as { data, status, headers }. `data` is unchecked here: each adapter
   // checks it against the contract's schema (D-03).
-  return { data: body, status: response.status, headers: response.headers } as T
+  return { data: body.value, status: response.status, headers: response.headers } as T
 }

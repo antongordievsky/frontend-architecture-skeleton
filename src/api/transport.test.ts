@@ -43,6 +43,33 @@ describe('transport', () => {
     expect(error).toMatchObject({ problem: { kind: 'http', status: 503, body: problem } })
   })
 
+  test('an error status keeps its status when its body is empty, as a gateway sends it', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        async () =>
+          new Response('', { status: 503, headers: { 'content-type': 'application/json' } }),
+      ),
+    )
+    await expect(transport('/transactions')).rejects.toMatchObject({
+      problem: { kind: 'http', status: 503, body: undefined },
+    })
+  })
+
+  test('a connection that drops mid-body is a network error, not a contract error', async () => {
+    const dropped = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode('{"items": ['))
+        controller.error(new TypeError('terminated'))
+      },
+    })
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(dropped, { headers: { 'content-type': 'application/json' } })),
+    )
+    await expect(transport('/transactions')).rejects.toMatchObject({ problem: { kind: 'network' } })
+  })
+
   test('a body that is not JSON is a contract error', async () => {
     vi.stubGlobal(
       'fetch',
