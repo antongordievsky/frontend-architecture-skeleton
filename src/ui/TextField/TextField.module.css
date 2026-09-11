@@ -1,0 +1,66 @@
+/* D-28: styled through React Aria's state attributes; every value is a token. */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.label {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--text);
+}
+
+.input {
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  font: inherit;
+  color: var(--text);
+  background: var(--surface);
+
+  /*
+   * QR-12: a text field takes a caret, not a pointer. The kit's rule is that an interactive part shows what it
+   * does; for text that is the I-beam, and `pointer` here would promise a click that does nothing.
+   */
+  cursor: text;
+  outline: none;
+  transition: border-color var(--duration-fast);
+}
+
+.input[data-hovered] {
+  border-color: var(--text-muted);
+}
+
+/* QR-12: the ring shows for the keyboard only, never for a mouse press. */
+.input[data-focus-visible] {
+  outline: var(--focus-width) solid var(--focus);
+  outline-offset: var(--focus-offset);
+}
+
+.input[data-invalid] {
+  border-color: var(--negative);
+}
+
+.input[data-disabled] {
+  color: var(--on-disabled);
+  background: var(--disabled);
+  border-color: var(--border);
+  cursor: not-allowed;
+}
+
+.description {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.error {
+  font-size: var(--text-sm);
+  color: var(--negative);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .input {
+    transition: none;
+  }
+}
