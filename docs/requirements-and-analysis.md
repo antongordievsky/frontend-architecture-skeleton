@@ -2385,6 +2385,19 @@ the correction is recorded here, dated, with what triggered it. This is the chai
 - *Changed:* a claim about what code does at runtime is measured at runtime. D-07's CSP row comes from the
   browser, under the Caddyfile's header, counting `securitypolicyviolation` events.
 
+### CC-10 — The router's link and the kit's link were assumed to work together once joined · 2026-09-11
+
+- *Assumed:* plan 06 joined them with TanStack Router's `createLink`, the path its custom-link guide documents
+  for React Aria. The component test pressed a link with the mouse only.
+- *Found:* the wrap-up drove the app by the keyboard. In all three engines, Enter on any link loaded the page again:
+  a marker set on `window` was gone, and one load event fired. The app's state and its query cache went with it.
+  React Aria follows a link pressed with Enter by itself. It creates a separate `<a>` and clicks it, and the
+  router never sees that click (react-aria 1.21's `openLink`). It uses the app's `navigate` only when given one
+  through its `RouterProvider`.
+- *Changed:* the root route wraps the routes in `RouterLinkNavigation`. A component spec presses Enter, and checks
+  both that the current page moves and that the address stays inside the app. Links and controls are tested by
+  the keyboard, as well as by the pointer.
+
 ---
 
 # Part III — Delivery

@@ -19,27 +19,40 @@ Everything runs in Docker (C-2). Host commands use the runtimes pinned in `mise.
 | Format the tree | `mise exec -- bun run format` |
 | Lint · typecheck only | `mise exec -- bun run lint` · `mise exec -- bun run typecheck` |
 | Tests only (Vitest, logic in Node) | `mise exec -- bun run test` |
+| Component tests and screenshots, three engines (D-14) | `docker compose run --rm browser` |
+| Rewrite the screenshot baselines, on purpose, then look at the images in the diff | `docker compose run --rm browser --update-snapshots` |
 | Regenerate the API client after a contract change | `mise exec -- bun run generate` |
 | Regenerate the route tree after adding, renaming or removing a route file (the dev server does it too) | `mise exec -- bun run routes` |
 | Production headers and cache rules (with `web-prod` running) | `sh scripts/check-headers.sh` |
 | Refresh the code index | `mise exec -- bun run graph:update` (`graph:build` rebuilds from scratch) |
 
 - `WEB_PORT` and `PROD_PORT` override 5173 and 8080 when they are taken.
-- `check` = format → lint → contract drift → route-tree drift → typecheck → tests → build → secrets →
-  audit. `lint` is oxlint, then `lint/layers.test.mjs`, which proves the D-16 boundary rule on its
-  fixture. Both drift gates (`scripts/check-contract.sh`, `scripts/check-routes.sh`) regenerate into a
+- `check` = format → lint → tokens → contract drift → route-tree drift → typecheck → tests → build →
+  secrets → audit. `lint` is oxlint, then `lint/layers.test.mjs`, which proves the D-16 boundary rule on
+  its fixture. `scripts/check-tokens.mjs` keeps every colour and custom property in `src/ui/tokens.css`,
+  and refuses a `var(--…)` that file does not define (D-28). Both drift gates (`scripts/check-contract.sh`, `scripts/check-routes.sh`) regenerate into a
   scratch copy under `node_modules/.cache` and compare; they never write to the tree.
 - The contract (`contract/openapi.yaml`) is the source of every server type (QR-5). `src/api/generated`
   is its output: never edited by hand, skipped by Biome, private to `src/api` (lint).
 - Tests (D-09): `*.test.ts` beside the code they test, run by Vitest in Node — no simulated page;
-  anything that renders is Playwright's (plan 07). The stand-in backend is `mock/handler.ts` (D-04); a
+  anything that renders is Playwright's. A part's states are stories (`<Name>.story.tsx`, one export
+  each), mounted by `<Name>.spec.ts` in the story gallery (`playwright/gallery/`, D-14) in Chromium,
+  WebKit and Firefox, with zero-tolerance screenshots in `__screenshots__/`. The baselines are Linux
+  images, so these run only in the `browser` service; before a commit that changes a part, a story or a
+  stylesheet, the agent runs it (D-09's note). The stand-in backend is `mock/handler.ts` (D-04); a
   test plugs it into `fetch` with `asFetch`. Only test files may import from outside `src/`, and only
   `mock/` (lint). The type-level amount test (`*.typetest.ts`) is checked by `typecheck`.
 - Any change to `package.json` — a script included — makes pre-commit run the Docker gate, which the
   sandbox refuses (`~/.docker` is not writable), so such a commit runs outside it (found in plan 04).
 - Boundaries (D-16): the layer map is in `lint/layers.js`; the zones that exist are the rule's option in
   `.oxlintrc.json`. A new top-level folder in `src/` fails lint until its row is added. A new boundary
-  gets a marked case in `lint/fixtures/layers` in the same commit.
+  gets a marked case in `lint/fixtures/layers` in the same commit. Only `ui/` imports React Aria, only
+  `components/RouterLink` imports the router's `Link`, and only stories and specs import a story; raw
+  `a`, `button`, `input`, `select`, `textarea` and `dialog` exist only inside `ui/` (FR-5).
+- Adding a part (QR-17): `src/ui/<Name>/` with `<Name>.tsx` wrapping React Aria, `<Name>.module.css`
+  (tokens only, styled through React Aria's `data-*` states, with the pointer and a keyboard focus ring)
+  and `<Name>.module.d.css.ts` naming its classes, `index.ts`, `<Name>.story.tsx` and `<Name>.spec.ts` →
+  `docker compose run --rm browser --update-snapshots` → look at every new image → `check`.
 - Routes (D-05): route files in `src/routes/` belong to the shell and stay thin — a path, a search
   schema, the page from its zone's `index.ts`. `src/routeTree.gen.ts` is generated from them
   (`tsr.config.json`): committed, never edited by hand, skipped by Biome. A page reads its parameters
@@ -58,8 +71,8 @@ Everything runs in Docker (C-2). Host commands use the runtimes pinned in `mise.
     or the image change, and the lockfile's age gate when `bun.lock` changes: a version the commit adds
     must be older than the quarantine (CC-08);
   - commit-msg — the Conventional Commits header, at most 100 characters;
-  - pre-push — `check` in Docker and the header test on the production form, on its own compose project
-    and port (`PRE_PUSH_PORT`, default 18080).
+  - pre-push — `check` in Docker, the `browser` service, and the header test on the production form, on
+    its own compose project and port (`PRE_PUSH_PORT`, default 18080).
 - Adding a package (D-23): verify it first (Security below), then `mise exec -- bun add <name>`. It
   asks the author, saves an exact version, and refuses versions younger than 7 days.
 - Updating (QR-25): one batch at the start of a plan — `bun outdated`, then `bun update <names>`,

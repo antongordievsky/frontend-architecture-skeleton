@@ -1,6 +1,6 @@
 # Plan 06 — The UI foundation: tokens, the first parts, and the gallery that tests them
 
-**Status:** in progress — GREEN LIGHT 2026-09-11 · **Timebox:** 90 min of execution
+**Status:** done 2026-09-12 — GREEN LIGHT 2026-09-11 · **Timebox:** 90 min of execution
 **Serves:** FR-5, QR-7, QR-11, QR-12, QR-17, QR-20, QR-22, QR-23, QR-24, QR-25, DR-1 · **Applies:** D-07, D-28, D-14,
 D-09 (settled below), D-16, D-21, D-23, D-12
 
@@ -141,3 +141,159 @@ tests run in pre-commit or only in the browser profile. The note reads:
 2. WebKit and Firefox baselines: Chromium only, recorded;
 3. `components/RouterLink` and the rule against the router's `Link`: the screens keep the router's `Link`, styled
    by the zone.
+
+## What happened
+
+Executed 2026-09-11 on `build/06-ui-foundation`, from 20:08 to 20:52 by the commits' timestamps. That is inside the
+90-minute timebox, and nothing was cut. The wrap-up ran past midnight, because `/code-review` first stopped on a
+session limit and was run again after it reset. Eleven commits:
+- `1ad10cc` — the plan, and D-09's note;
+- `4b5bcd1` — React Aria Components 1.21.0 and Playwright Test 1.62.1;
+- `15a91ba` — tokens, two themes, the token gate and the browser list;
+- `7110991` — the gallery, the `browser` service and pre-push;
+- `2a95202` — `ui/Button`, `ui/Link`, `components/RouterLink`, with stories, specs and 36 baselines;
+- `48187f6` — the shell and the error screen built from the parts;
+- `1a35587` — `react/forbid-elements` and three new boundaries in the layers rule;
+- `e090e26` — the fix for links followed by the keyboard (CC-10);
+- `6f3bde2` — the two gates that `/code-review` found holes in;
+- the commit that records this log.
+
+**The update batch (QR-25)** moved nothing: `bun outdated` offered no version past the quarantine newer than the
+current ones. `--all` reported CC-08's 51 versions, plus orval's 13 excluded, as expected until 2026-09-17.
+`react-aria-components` 1.21.1 was still inside the quarantine until 19:21 UTC, so the plan took 1.21.0.
+
+**Deviations**
+
+- *`src/index.css` stays.* The plan said to remove it. It is the shell's frame around both zones (`#root`), which is
+  the shell's, not the kit's. It now reads its values from tokens only.
+- *Themes in the tests come from the browser's colour scheme,* through Playwright's `colorScheme`. That is the path
+  users take. So stories do not repeat each state for the dark theme.
+- *Story ids fold a part's folder.* Playwright's convention makes `ui/Button/Button.story.tsx` into
+  `ui/Button/Button/Primary`. Each part here has a folder of its own name (D-16), so the gallery reads it as
+  `ui/Button/Primary`. The first run failed every mount with "unknown story", which is how this was found.
+- *Each CSS Module has a `*.module.d.css.ts`.* Under `noUncheckedIndexedAccess` a module's class reads as
+  `string | undefined`, and React Aria's `className` refuses `undefined` under `exactOptionalPropertyTypes`.
+  - `?? ''` would hide a misspelled class, and `as` is not allowed.
+  - The declaration names the classes, so a misspelling fails `typecheck`.
+  - A class renamed only in the stylesheet fails the screenshots.
+- *The new boundaries went into the layers rule, not `no-restricted-imports`.* `domain` and `api` already set
+  `no-restricted-imports` in their overrides, and an override replaces a rule's options rather than merging them.
+  So the kit's packages would have been allowed in exactly those layers. The layers rule also comes with its
+  fixture test, as `CLAUDE.md` asks of every new boundary.
+- *`RouterLinkNavigation` was not in the plan.* The wrap-up's keyboard pass found that it was needed (CC-10).
+- *Playwright MCP was not connected in this session,* as in plan 05. Scripts in the `browser` service drove the dev
+  server and probed `web-prod` instead.
+- *The commit-msg hook refused a header* that began with a capital letter ("Button"). The same commit went through
+  with the header reworded.
+
+**Surprises**
+
+- *A stale pre-bundle cache made the browser tests flaky.*
+  - Vite pre-bundles what `index.html` reaches. The gallery reaches stories through `import.meta.glob`, so a cache
+    made before any story existed was reused. React Aria was then found mid-test, and the page reloaded under it.
+  - Reproduced: stories hidden, cache built, stories restored. 4 of 33 then failed, with "Execution context was
+    destroyed … navigation".
+  - Fixed: `optimizeDeps.entries` names the gallery and the stories, and browser runs start Vite with `--force`.
+    The same reproduction then passed 33 of 33.
+  - This was not the flakiness D-14's "Wrong if" means. Zero tolerance itself has not flaked: every run without a
+    change passed.
+- *Enter on a link loaded the page again* (CC-10), in all three engines, until the fix.
+- *Default tolerance.* D-14's spike already showed that Playwright's default tolerance of 0.2 misses a token change,
+  so the config sets zero.
+- *Chromium reports the pressable rule's `touch-action` as `manipulation`,* its serialization of the same set.
+  WebKit and Firefox report `pan-x pan-y pinch-zoom`.
+- *Lightning CSS adds `--lightningcss-light` and `--lightningcss-dark`* where `color-scheme` is set. So
+  `light-dark()` may compile down for our browsers, which would let the dark theme be written once. Not measured.
+- *The main chunk grew from 106 to 119 kB gzip.* React Aria loads with the shell, because the navigation and the
+  error screen are on every page. Plan 08's budget watches it.
+- *The top-level `playwright` package is 1.63.0-alpha,* brought by `@playwright/mcp`. A script that imports
+  `playwright` wants browsers the 1.62.1 image does not have. The tests import `@playwright/test`, whose own
+  `playwright` is 1.62.1.
+
+**Proof (QR-23)** — each break was run on purpose and then restored:
+
+| Test or gate | Deliberate break | Seen |
+|---|---|---|
+| token gate | a hex colour, `var(--color-acent)`, `--button-bg` in a module, `color: red`, `rgb()`, and `var(--gray-999)` inside `tokens.css`, each on a scratch copy of `src` | exit 1 each, with the file and line; tokens in `border`, `outline` and `box-shadow` shorthands pass |
+| the gallery's contract | the gallery renders nothing for an unknown story, instead of rejecting | 3 failed: "Received promise resolved instead of rejected" |
+| Button presses | `onPress` not passed through | 3 failed: "Expected 3, Received 0" |
+| focus ring | the `[data-focus-visible]` outline removed | `outline-style` "none" instead of "solid" in each engine; the focused screenshots fail |
+| cursor | `cursor: default` | "Expected pointer, Received default" in each engine |
+| a token reaches every part | `--blue-700` moved by one unit | all 6 light screenshot tests fail (3389 and 229 pixels); all 6 dark ones pass |
+| `aria-current` | not passed through to React Aria | the Link and RouterLink current-page specs fail |
+| Enter moves within the app | the story's root without `RouterLinkNavigation` | 3 failed: "Received string: http://localhost:5173/". The first version of the test checked only `aria-current`, and passed on this break, because the page load landed on the app, which has its own Dashboard link |
+| stale cache | stories hidden while the cache was built | 4 of 33 failed before the fix; 33 of 33 after |
+| the CSP element | removed from `index.html`, `web-prod` rebuilt | "style-src-elem inline" on each of 4 addresses in each engine |
+| React Aria outside `ui` | the layers rule's kit check off | "expected, not reported: …DashboardPage.tsx:12" |
+| a story in shipped code | the story check off | its case is not reported, and "ui/Card is private" appears unexpected |
+| the router's `Link` | the check off | both cases, the import and the re-export, are not reported |
+| raw controls | a raw `<button>` in `ErrorScreen`; the same inside `ui/Button`; the `ui` and story override pointed elsewhere | "react(forbid-elements): <button> is forbidden. help: use Button from ui/"; exit 0 inside `ui`; the story's hidden `<input>` reported |
+
+**Verification**
+
+- The full `check` passed on the host and in Docker at `1a35587`, and again at `e090e26` through pre-commit:
+  - 32 fixture violations;
+  - 7 stylesheets through the token gate;
+  - 64 tests, the build, no leaks, and `bun audit` clean at 426 packages.
+- `docker compose run --rm browser`: 36 passed (13 s), in every run without a change.
+- `vite build`: `dist` holds no gallery, story or spec string.
+- The production form, probed in Chromium, WebKit and Firefox on `/`, `/transactions`, `/transactions/tx-1` and an
+  unknown address:
+  - no CSP violation and no CSP line in the console;
+  - React Aria inserted no `<style>`;
+  - 11 pressable elements with the rule applied.
+  - `scripts/check-headers.sh` passes.
+- The dev server, driven by the keyboard in three engines:
+  - Tab stops on each navigation link with a solid 2px ring;
+  - the pointer on hover;
+  - `aria-current` on the current page;
+  - Enter moves within the app, the not-found screen's link included, with one history entry per move;
+  - the body paints `rgb(255, 255, 255)` in the light theme and `rgb(11, 17, 32)` in the dark one;
+  - screenshots of both themes looked right.
+- The error screen's "Try again" could not be reached in the app: no screen loads data until plan 07. It was driven
+  in the Button stories instead.
+
+**Reviews at wrap-up**
+
+- `/code-review` — five findings, one medium and four low. It first killed two suspicions of its own by
+  measuring: `mount` is a real fixture of Playwright 1.62.1, and a click does not navigate twice, because
+  TanStack calls `preventDefault` before React Aria's own hop.
+  - *Fixed, in the commit after this plan's code:*
+    - the token gate read colours only in a property list without the image longhands, so
+      `background-image: linear-gradient(red, blue)` passed while the shorthand was caught;
+    - the layers rule checked the router's `Link` on imports and named re-exports, but not on
+      `export * from '@tanstack/react-router'`.
+  - *Measured, and not reproduced:* `list-style: none` was said to drop the list's semantics in Safari. In
+    Chromium, WebKit and Firefox the navigation still reports one `list` with three `listitem`s. `role="list"`
+    is also refused by `jsx-a11y/no-redundant-roles`. Real Safari with VoiceOver cannot be measured here.
+  - *Recorded, below:* the keyboard's navigation options, and an ambiguous short story id.
+- `/security-review` — nothing found in the plan's diff. Every candidate it raised scored 1 or 2 out of 10 for
+  confidence, below the skill's threshold of 8:
+  - the keyboard's `navigate` cannot be given a foreign or `javascript:` address: React Aria calls it only for a
+    same-origin link, and the router refuses a dangerous protocol. No untrusted value reaches a link's address;
+  - the gallery's `window.mount` is reachable only from the same origin, renders only existing stories, and never
+    enters the build;
+  - the `browser` container runs as root with the tree mounted, as `check`'s already does. That is D-26's named
+    gap, not a new one: it publishes no port, and the browsers open only the local gallery;
+  - the token gate reads stylesheets and spawns nothing; the lint changes only add rules; the `<div>` for React
+    Aria's style is read by no code of ours.
+
+**Noted, not done**
+
+- *A link followed by the keyboard carries no navigation options* (`/code-review`'s medium finding).
+  `RouterLinkNavigation` reduces the hop to the address alone, so a link with `replace`, `resetScroll` or a
+  view transition would behave differently under Enter than under a click — the same shape of defect as CC-10.
+  - No link sets any of them today, and `endSession`'s `replace` is programmatic, so nothing is wrong now.
+  - The fix is not one line: React Aria's `routerOptions` is `never` until the app augments its `RouterConfig`,
+    and TanStack's `createLink` does not put its own props there. It needs that augmentation and a mapping from
+    the link's props, with a spec that presses Enter on a `replace` link and counts the history entries.
+- *A short story id is not checked for being unique.* The gallery takes the first file whose path ends with it,
+  though the convention promises a unique suffix. Two parts of the same name in different folders would mount the
+  wrong one silently. Rejecting an ambiguous id would need a duplicate story in `src` to prove it.
+- The two dark-theme blocks in `tokens.css` are kept identical by hand. No gate compares them, and the screenshots
+  test only the one the system's setting chooses. `light-dark()` through Lightning CSS may remove the copy.
+- A namespace import (`import * as Router from '@tanstack/react-router'`) gets past the rule on the router's `Link`.
+- The baselines are arm64 Linux images from this machine. A CI on amd64 may render differently: D-14's "Wrong if",
+  and D-11.
+- `react-aria-components` 1.21.1, and `@playwright/test` 1.63.0 with its image, belong to plan 07's update batch.
+  The image and the package move together.
