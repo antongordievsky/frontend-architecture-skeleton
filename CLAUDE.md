@@ -20,14 +20,15 @@ Everything runs in Docker (C-2). Host commands use the runtimes pinned in `mise.
 | Lint · typecheck only | `mise exec -- bun run lint` · `mise exec -- bun run typecheck` |
 | Tests only (Vitest, logic in Node) | `mise exec -- bun run test` |
 | Regenerate the API client after a contract change | `mise exec -- bun run generate` |
+| Regenerate the route tree after adding, renaming or removing a route file (the dev server does it too) | `mise exec -- bun run routes` |
 | Production headers and cache rules (with `web-prod` running) | `sh scripts/check-headers.sh` |
 | Refresh the code index | `mise exec -- bun run graph:update` (`graph:build` rebuilds from scratch) |
 
 - `WEB_PORT` and `PROD_PORT` override 5173 and 8080 when they are taken.
-- `check` = format → lint → contract drift → typecheck → tests → build → secrets → audit. `lint` is
-  oxlint, then `lint/layers.test.mjs`, which proves the D-16 boundary rule on its fixture. The drift
-  gate (`scripts/check-contract.sh`) regenerates into a scratch copy under `node_modules/.cache` and
-  compares; it never writes to the tree.
+- `check` = format → lint → contract drift → route-tree drift → typecheck → tests → build → secrets →
+  audit. `lint` is oxlint, then `lint/layers.test.mjs`, which proves the D-16 boundary rule on its
+  fixture. Both drift gates (`scripts/check-contract.sh`, `scripts/check-routes.sh`) regenerate into a
+  scratch copy under `node_modules/.cache` and compare; they never write to the tree.
 - The contract (`contract/openapi.yaml`) is the source of every server type (QR-5). `src/api/generated`
   is its output: never edited by hand, skipped by Biome, private to `src/api` (lint).
 - Tests (D-09): `*.test.ts` beside the code they test, run by Vitest in Node — no simulated page;
@@ -39,6 +40,17 @@ Everything runs in Docker (C-2). Host commands use the runtimes pinned in `mise.
 - Boundaries (D-16): the layer map is in `lint/layers.js`; the zones that exist are the rule's option in
   `.oxlintrc.json`. A new top-level folder in `src/` fails lint until its row is added. A new boundary
   gets a marked case in `lint/fixtures/layers` in the same commit.
+- Routes (D-05): route files in `src/routes/` belong to the shell and stay thin — a path, a search
+  schema, the page from its zone's `index.ts`. `src/routeTree.gen.ts` is generated from them
+  (`tsr.config.json`): committed, never edited by hand, skipped by Biome. A page reads its parameters
+  through `getRouteApi('<route id>')`, never by importing its route file. Failures render through the
+  router's defaults, `components/ErrorScreen` (D-18).
+- Adding a page (QR-17): `src/<zone>/pages/<Name>/` with `index.ts` and `<Name>Page.tsx` → export it
+  from the zone's `index.ts` → a route file in `src/routes/` that imports it from `@/<zone>` →
+  `bun run routes` → `check`.
+- `package.json` declares every module free of side effects except CSS, so each page gets its own
+  chunk (CC-07). A module imported only for what it does on import is dropped silently: list it in
+  `sideEffects`, or call its effect from `main.tsx`.
 - Hooks (`.githooks/`, switched on once by `bun install` through `prepare`). Each refuses to run while
   the working tree differs from what it checks; set unrelated changes aside with
   `git stash push --include-untracked -- <paths>`.

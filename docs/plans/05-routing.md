@@ -1,6 +1,6 @@
 # Plan 05 — Routing, the shell and the error states
 
-**Status:** in progress — GREEN LIGHT 2026-09-11 · **Timebox:** 60 min of execution
+**Status:** done 2026-09-11 — GREEN LIGHT 2026-09-11 · **Timebox:** 60 min of execution
 **Serves:** FR-4, QR-3, QR-4, QR-11, QR-17, QR-20, QR-23, QR-25, DR-1 (the public zone's first page), DR-2 (the
 reaction to a 401), DR-3 (a place for the guard) · **Applies:** D-05, D-18, D-17 (amended), D-16 (amended
 below), D-03, D-09, D-23
@@ -141,3 +141,142 @@ address), and the flow moves to plan 07's Playwright tests. That goes in the log
 2. the production-form pass moves to plan 07's wrap-up.
 
 The gates and the error states are not cut.
+
+## What happened
+
+Executed 2026-09-11 on `build/05-routing`, from 14:48 to 15:14 by the hooks' timestamps, then the
+wrap-up. It stayed inside the timebox, and nothing was cut. Ten commits:
+- `1c89cfd` the D-16 amendment;
+- `a454f3c` this plan;
+- `b74caed` the packages (`bun add @tanstack/react-router`, then
+  `bun add -d @tanstack/router-plugin @tanstack/router-cli@1.167.33`);
+- `6570d45` routes in the shell (lint);
+- `17d51cc` the router, the shell and the routes, with the tree from `mise exec -- bun run routes`
+  (`tsr generate`, `@tanstack/router-cli` 1.167.33);
+- `5f2d804` CC-07;
+- `b0dc261` the route drift gate;
+- `83a6bd4` the error states and the reaction to a 401;
+- `e376cdc` the browser pass's fix;
+- `5e3e4a9` the reviews' two fixes.
+
+**Deviations and surprises**
+
+- *The update batch was empty.* `bun outdated` offered nothing past the quarantine: zod, `@babel/core` and
+  Biome have newer versions inside it. orval's exclusions stay. 8.31.0 was published 2026-09-10 and ages
+  on 2026-09-17, so plan 04's "remove at plan 05" came too early, and `bunfig.toml`'s comment now carries
+  the date.
+- *`public` joined the zones in step 5, with its first page, as D-16 says,* rather than in step 4.
+- *Automatic code splitting kept the whole app zone in one chunk (CC-07).* This is D-05's "Wrong if",
+  measured.
+  - Each route's chunk (0.09 kB) only re-exported its page from one 2.08 kB chunk that held every page.
+  - `"sideEffects": ["**/*.css"]` in `package.json` fixed it. Now each page is its own chunk:
+    dashboard 0.41 kB, settings 0.40 kB, transactions 0.37 kB, details 0.72 kB, the layout 0.74 kB,
+    sign-in 0.66 kB.
+  - This replaced the lazy wrappers the "Wrong if" had planned, and D-05 stands as decided.
+  - The cost is in CC-07: a module imported for its side effect is now dropped silently.
+- *The entry chunk grew.*
+  - Before the router: 220.09 kB (68.85 kB gzip).
+  - With the router: 316.51 kB (100.22 kB gzip).
+  - With the error states and `zod/mini` in the sign-in route's schema: 333.93 kB (106.09 kB gzip).
+  - Plan 08's budget sets the number.
+- *In Node, a load commits no matches when the validated search differs from the address.*
+  - With `//evil.example` as `redirect`, `router.load()` resolved with no matches and no navigation
+    event, while `matchRoutes` gave the right `{ redirect: '/' }`.
+  - In the browser, the app rewrites the address to the validated one (`/sign-in?redirect=%2F`), so this
+    happens only without `RouterProvider`.
+  - The return-address tests use `matchRoutes` through the real route tree.
+- *The router writes a default into the address:* `/sign-in` becomes `/sign-in?redirect=%2F`.
+- *A test that could not fail, caught while planning its proof.* The first "already on the sign-in page"
+  test read the state before the asynchronous navigation had settled, so it would have passed without
+  the guard. `endSession` now returns the navigation, and the tests await it.
+- *`tsr generate` prints a Node warning on every run:* "Accessing non-existent property
+  'replaceRouteChunk' of module exports inside circular dependency". The output was identical across
+  runs.
+- *`check` failed twice on formatting of new files,* a wrapped line and `package.json`'s new array.
+  `bun run format` fixed both.
+- *The Playwright MCP server was not connected in this session.* It is in `.mcp.json`, but no tools were
+  offered.
+  - The browser pass ran as a script instead, on the installed `playwright` 1.63.0-alpha (from
+    `@playwright/mcp`), with the cached Chromium headless shell build 1234.
+  - The installed core wanted build 1243, which is not downloaded. `npx playwright install` was not run
+    without the author's go.
+- *The sandbox cannot reach the published port 8080.* The headers test and the browser pass ran outside
+  it.
+
+**Proof (QR-23)** — every row seen failing, then restored:
+
+| Test or gate | Break | Seen |
+|---|---|---|
+| routes belong to the shell | the `routes` mapping removed from the rule | "src/routes is not a known layer", and both expected reports missing |
+| a route past a zone's `index.ts`; a page importing a route file | fixture cases | reported with their reasons, 28 of 28, and silence for the allowed imports |
+| typed links | a navigation link to `/transaction` | TS2820 "… Did you mean '"/transactions"'?" |
+| the typed route parameter | the details page reads `id` | TS2339 "Property 'id' does not exist on type '{ transactionId: string; }'" |
+| the route drift gate | a route file added without regenerating | exit 1, with `AppReportsRoute` in the diff |
+| the route drift gate | `settings.tsx`'s path changed to `/_app/setting` | exit 1, with the generator restoring `/_app/settings` |
+| `redirect` accepts only a path on this site | the path check removed | the four hostile addresses fail |
+| `describeError` | 403 mapped to the generic error | "a 403: no access" fails |
+| never the server's words (QR-10) | the response body put into the message | the QR-10 test fails |
+| the 401 signal | the signal also fires on 403; then the signal removed | "a 403 does not" fails; then "a 401 … raises it once" fails |
+| `endSession` | the cache left uncleared; the return address dropped; the already-on-sign-in guard removed | each of the three tests fails in turn |
+| the back link is not the current page | the fix absent (before `e376cdc`) | the browser pass saw `aria-current` on the back link as well as on the section link |
+| no control character in `redirect` | the old pattern, `^\/(?![/\\])` | the tab, line-feed and carriage-return cases fail |
+| `endSession` clears the router's cache | `router.clearCache()` removed | "clears the router's cache too" fails |
+
+**Verification**
+
+- The full `check` passed on the host at every commit, through pre-commit: 64 tests at the end, 28 fixture
+  violations, both drift gates, no leaks, and `bun audit` clean at 413 packages. The Docker gate passed at
+  `b74caed`, `17d51cc` and `b0dc261`.
+- `bun run routes` twice gives the same tree.
+- The bundle holds none of the stand-in's strings: 0 of 9 files.
+- The production form (`docker compose --profile prod up`):
+  - `scripts/check-headers.sh` passed all 10 checks, the CSP on the entry and on a client route
+    included;
+  - `/transactions/tx-1`, `/sign-in` and `/nope` load the app through Caddy's fallback.
+- The browser pass on the production form:
+  - every route shows its heading, and the current navigation link carries `aria-current="page"`;
+  - `/nope` shows "Page not found" with a link to the dashboard;
+  - `//evil.example` and `https://evil.example` as `redirect` become `/sign-in?redirect=%2F`, and the
+    page says it returns to `/`;
+  - Tab reaches Dashboard, Transactions and Settings with a visible focus ring and the pointer cursor;
+  - 0 console errors, so no CSP violation.
+  - It found one defect: on `/transactions/tx-1` the back link also carried `aria-current="page"`. It was
+    fixed in `e376cdc` and seen fixed.
+  - Noted, not changed: the navigation's "Transactions" link is current on a transaction's details, as
+    its section. That goes to plan 06's and plan 07's accessibility pass, with a skip link.
+- Not seen live: the API-driven states, until plan 07's stand-in server. Tests cover them in Node.
+
+**Reviews at wrap-up**
+
+- `/code-review` found two things, and both are fixed in `5e3e4a9`.
+  1. *Medium — the return address let other sites through.* The check looked only at the second
+     character. A browser deletes tabs and line breaks from a URL, so these three passed the check and
+     read as `//evil.example`:
+     - `/<tab>/evil.example`;
+     - `/<LF>/evil.example`;
+     - `/<CR>\evil.example`.
+
+     The reviewer confirmed it in Node, with `new URL`. Nothing navigates to the value yet, but the
+     plan's claim was false. The pattern now refuses any control character (`\P{Cc}`), and the three
+     cases are tests.
+  2. *Low — `endSession` cleared the query cache, not the router's.* The router keeps what recent and
+     preloaded loaders returned. No route has a loader yet. `endSession` now calls `router.clearCache()`
+     as well, so its comment holds. Plan 07's first loader should also consider
+     `defaultPreloadStaleTime: 0`, which TanStack recommends when an external cache owns the data.
+  - The reviewer also checked these and found no problem:
+    - the `routes` mapping and its fixtures;
+    - the drift gate;
+    - `sideEffects`: no module is imported only for its side effect;
+    - the closure between the query client and the router in `main.tsx`;
+    - several 401s arriving together;
+    - every branch of `describeError`;
+    - the CLI's and the plugin's shared generator, 1.167.33.
+- `/security-review` found nothing above its bar. It checked:
+  - that nothing navigates to `redirect`;
+  - that no server text reaches the page;
+  - that the cache is cleared on a 401;
+  - that the session model is unchanged;
+  - that the scripts take no outside input.
+
+  One note fell below its bar: the same control-character gap, found independently. It is fixed with
+  the finding above.
