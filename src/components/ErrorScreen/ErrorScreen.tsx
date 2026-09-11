@@ -1,5 +1,7 @@
-import { type ErrorComponentProps, Link, useRouter, useRouterState } from '@tanstack/react-router'
+import { type ErrorComponentProps, useRouter, useRouterState } from '@tanstack/react-router'
 import { useId } from 'react'
+import { RouterLink } from '@/components/RouterLink'
+import { Button } from '@/ui/Button'
 import { describeError, type ErrorDescription, NOT_FOUND } from './describeError.ts'
 
 type Props = { readonly description: ErrorDescription; readonly onRetry?: () => void }
@@ -13,15 +15,13 @@ function ErrorScreen({ description, onRetry }: Props) {
       <h1 id={titleId}>{description.title}</h1>
       <p>{description.message}</p>
       {description.action === 'sign-in' && (
-        <Link to="/sign-in" search={{ redirect: href }}>
+        <RouterLink to="/sign-in" search={{ redirect: href }}>
           Sign in
-        </Link>
+        </RouterLink>
       )}
-      {description.action === 'home' && <Link to="/">Go to the dashboard</Link>}
+      {description.action === 'home' && <RouterLink to="/">Go to the dashboard</RouterLink>}
       {description.action === 'retry' && onRetry !== undefined && (
-        <button type="button" onClick={onRetry}>
-          Try again
-        </button>
+        <Button onPress={onRetry}>Try again</Button>
       )}
     </section>
   )

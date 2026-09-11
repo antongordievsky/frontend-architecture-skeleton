@@ -1,0 +1,14 @@
+/* The taxpayer's zone: the navigation above every page. Every value is a token (D-28). */
+.header {
+  margin-bottom: var(--space-6);
+  padding-bottom: var(--space-4);
+  border-bottom: 1px solid var(--border);
+}
+
+.links {
+  display: flex;
+  gap: var(--space-6);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
