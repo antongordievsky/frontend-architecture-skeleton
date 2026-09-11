@@ -1717,7 +1717,9 @@ more generated file to keep. It is decided now because plan 05 builds the shell,
     - a build plugin that runs Babel 7 beside the Compiler's Babel 8;
     - a screen appears in two places, its page module and its route file, which the "add a page" recipe
       names;
-    - the router releases weekly, so the quarantine keeps us up to two weeks behind.
+    - the router releases weekly, so the quarantine keeps us up to two weeks behind;
+    - *added 2026-09-11, CC-07:* pages stay in separate chunks only because `package.json` declares the
+      modules free of side effects. A module imported for its side effect must be listed there.
   - *Growth path:*
     - D-06 puts the table's sort, filter and cursor into the transactions route's search schema;
     - D-18's guard becomes a `beforeLoad` on a zone's layout route;
@@ -1944,6 +1946,30 @@ the correction is recorded here, dated, with what triggered it. This is the chai
   - The code follows in its own plan, before any screen formats fiat (plan 07).
 - **Lesson:** a unit left implicit is a unit two sides can disagree on. Test a lookup on the cases where
   its sources disagree, not only on the ones where they all agree.
+
+### CC-07 — Automatic code splitting was assumed to give each page its own chunk · 2026-09-11
+
+- **Assumed:** D-05 took the router's automatic code splitting to put each route's screen into its own
+  chunk. It wrote down one doubt, as its "Wrong if": pages reached through a zone's `index.ts`.
+- **Found:** at plan 05's build, the doubt was right.
+  - Each route got a chunk of 0.09 kB that only re-exported its page from one shared chunk of 2.08 kB. That
+    shared chunk held every page of the app zone.
+  - The bundler could not tell that the other re-exports in `app/index.ts` were free of side effects, so it
+    kept the whole zone together.
+  - Declaring the modules free of side effects, except CSS, fixed it: `"sideEffects": ["**/*.css"]` in
+    `package.json`. Each page then had its own chunk of 0.40 to 0.74 kB, and the entry went from 325.27 to
+    316.51 kB.
+- **Changed:**
+  - `package.json` declares `sideEffects`. D-05's "Wrong if" had planned a different response: lazy
+    wrappers in the zone's `index.ts`, with automatic splitting switched off. The one line keeps the
+    decision as it was.
+  - It has a cost. A module imported only for what it does on import (`import './x'`) is now dropped from
+    the build without a word. Such a module is listed in `sideEffects`, or its effect is called explicitly
+    from `main.tsx`. Plan 08's reporter is the first candidate.
+  - Nothing guards the split today. Plan 08's bundle budget should also check that each page stays in its
+    own chunk.
+- **Lesson:** a barrel is a boundary for people and for lint, but to a bundler it is one module that
+  imports everything. Measure the chunks, not the config.
 
 ---
 
