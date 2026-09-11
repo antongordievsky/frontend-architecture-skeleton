@@ -323,7 +323,8 @@ Options are genuinely different approaches, and the company's own stack is alway
 | D-09 | How do we know the product works, and that our tests would notice if it stopped? (amended: mutation testing deferred as future work) | FR-6, QR-12, QR-22, QR-23, QR-4, QR-8, QR-21, QR-24 | plan 04 (first tests) |
 | D-05 | How does each address lead to its screen, and how do we stop links and filters in the address from breaking? | FR-4, QR-3, QR-4, FR-2, QR-17, QR-20, DR-1, DR-3, QR-21, QR-24 | plan 05 |
 | D-18 | Who may open which screen, and how does a new role arrive without a frontend release? (design for) | DR-3, QR-17, DR-4, DR-8, QR-8, QR-24 | plan 05 |
-| D-07 | UI foundation: kit, styling model, tokens | FR-5, QR-12, QR-21, QR-22 | plan 06 |
+| D-07 | Which library gives our parts their behaviour, so that everyone can use them — by keyboard, screen reader and touch? | QR-12, FR-5, FR-7, QR-11, QR-24, QR-20, QR-21, QR-8 | plan 06 |
+| D-28 | How do we write the look, so the design can change without rewriting the screens? (split from D-07) | FR-5, QR-7, QR-12, QR-22, QR-11, QR-8, QR-24, QR-21, DR-1, QR-17 | plan 06 |
 | D-14 | Storybook and visual regression | FR-5, QR-8, QR-21 | plan 06 |
 | D-06 | State placement (server, URL, client) and the table's data model | FR-3, FR-7, QR-6 | plan 07 |
 | D-19 | Observability and metrics | QR-10, DR-7 | plan 08 |
@@ -1834,6 +1835,247 @@ answer. Nothing else is built before the support zone's first page (D-16).
     - "add a permission" (QR-17): a value in the contract's enum, regenerate, then `can()` where it is used;
     - accountants: an account switcher, and a session per account acted for.
 
+### D-07 — Which library gives our parts their behaviour, so that everyone can use them — by keyboard, screen reader and touch?
+
+`Accepted` 2026-09-11 · needed by plan 06 · build now · judged by QR-12, FR-5, FR-7, QR-11, QR-24, QR-20, QR-21,
+QR-8
+
+**What we are deciding.** Menus, selects, searchable lists, dialogs, date pickers and tables follow exact rules for
+the keyboard, focus and screen readers. Getting them wrong locks people out, often without anyone on the team
+noticing. We want a library that gets these rules right and does nothing else: how the product looks stays
+entirely ours. The candidates differ in four ways:
+- how much they cover;
+- whether they are tested with real screen readers;
+- whether they fit the security policy we agreed;
+- how healthy the project behind them is.
+
+It is decided now because plan 06 builds the first parts.
+
+**Not decided here:**
+- how the parts are styled and themed (D-28);
+- the table's data model, and whether TanStack Table computes what the table shows (D-06);
+- a component gallery (D-14).
+
+**Candidates.**
+- *Out by the author's premise* (below): each of these brings its own look — Material UI 9.4.0, Ant Design
+  6.6.2, Fluent UI 9.74.7, React Spectrum S2 1.7.0, HeroUI 3.2.4, Chakra UI 3.37.0 and Radix Themes 3.3.0.
+- *Out as unmaintained:* Headless UI 2.2.10 (no commit since 2026-04-13) and Reach UI (last release in 2022).
+- *Built side by side:* the rest. Each library got the same select, searchable list, menu and dialog, and all of
+  them were driven by the keyboard in a real browser.
+
+| Criterion | A — React Aria Components 1.21.0 | B — Base UI 1.7.0 | C — Radix Primitives 1.6.7 | D — Ark UI 5.39.1 | E — Ariakit 0.4.39 | F — Mantine 9.6.0, headless | G — native HTML only |
+|---|---|---|---|---|---|---|---|
+| QR-12 keyboard, measured on the four parts | ✅ 4 of 4 | ✅ 4 of 4 | ⚠️ 3: it has no searchable list | ✅ 4 of 4 | ✅ 4 of 4 | ⚠️ no type-ahead in the select; Enter focuses the menu, not its first item | ⚠️ no menu; the select and the list are drawn by the browser and cannot be styled |
+| QR-12 axe with the part open (WCAG 2.2 AA) | ⚠️ `aria-hidden-focus` while the list is open | ⚠️ as A | ⚠️ `aria-hidden-focus` in the select and the menu | ✅ none | ✅ none | ⚠️ an unnamed close button; `aria-required-children` in the menu | ✅ none |
+| QR-12 tested with real screen readers | ✅ named: VoiceOver on macOS and iOS, JAWS, NVDA and TalkBack, each in named browsers | ⚠️ "a broad spectrum", none named | ⚠️ "commonly used assistive technologies", none named | ❓ not documented | ❓ not documented | ❓ not documented | ✅ the browser's own |
+| Announcements and right-to-left in other languages | ✅ strings in 34 locales; right-to-left keyboard | ❓ | ❓ | ⚠️ a locale provider | ❓ | ❓ | ✅ |
+| FR-7 parts a data-heavy product needs: table, grid, tree, date picker, long lists | ✅ Table, GridList, Tree, DatePicker, Calendar, Virtualizer and drag and drop, among 70 modules | ⚠️ no table, no date picker (37 parts) | ❌ none of them | ⚠️ a date picker and a tree, no table | ❌ | ⚠️ date pickers in another package, not measured | ❌ |
+| QR-11 the agreed CSP, measured | ⚠️ 1 refused `<style>` at load, a touch rule; it takes a nonce when one exists | ✅ 0 with one setting (`CSPProvider disableStyleElements`), 1 without | ❌ 10: scroll locking and the select insert `<style>`, with no switch | ✅ 0 | ✅ 0 | ⚠️ 1 when the dialog opens | ✅ 0 |
+| The look is ours | ✅ unstyled; state exposed as `data-*` attributes and render props | ✅ | ✅ | ✅ | ✅ | ⚠️ headless mode drops the token-based props | ⚠️ the native select and list look like the browser's |
+| JS for the four parts, gzip, beyond React | ⚠️ 67.8 kB | 63.6 kB | 34.3 kB, without a searchable list | 53.4 kB | 48.5 kB | 59.2 kB | 0.5 kB |
+| QR-24 record | ⚠️ no provenance; 2 npm maintainers; Adobe's repository, 86 human commits in the last month; 13 packages | ✅ provenance; 8 maintainers; 64 commits; 9 packages | ⚠️ provenance; no commit since 2026-07-31; 74 packages | ⚠️ provenance; 2 maintainers; 28 commits, plus 60 in its state-machine engine; 90 packages | ⚠️ provenance; pre-1.0; 37 commits; 11 packages | ❌ one maintainer | ✅ |
+| QR-20 generated, not hand-written | ✅ its own examples in plain CSS or Tailwind, through the shadcn CLI | ⚠️ shadcn's `base`, Tailwind only | ⚠️ shadcn's `radix`, Tailwind only | ❓ | ❌ | ❌ | — |
+| QR-21 the company's stack | ❌ | ❌ | ✅ | ❌ | ❌ | ✅ | ⚠️ |
+| Adoption, npm downloads in the week to 2026-09-10 | 3.05 M | 9.48 M | 9.98 M | 0.72 M | 0.92 M | 1.78 M | — |
+
+- **Decision:** React Aria Components gives our parts their behaviour. It is the only candidate that names the
+  screen readers it is tested with and speaks to them in 34 languages. It passed every keyboard scenario. And it
+  covers the parts a data-heavy product lives on: tables, grids, trees, date pickers and long lists.
+  - *Set by the author at review, 2026-09-11.* The first draft of this entry was rejected:
+    - accessibility has to be shown, not ticked;
+    - the sample of libraries was too small;
+    - theming is ours, because the design will be updated and will differ;
+    - Tailwind is criticised for the volume of its classes, and the kit's modularity was in question.
+
+    The premise behind it: the product will meet competitors, and it lives on its user experience, so over time
+    design becomes an advantage people value. No library may decide the look, or limit how an interaction feels.
+  - *Why not Radix, the company's choice:*
+    - it has no searchable list;
+    - the CSP refuses it ten times, and nothing switches those refusals off;
+    - it has had no commit in six weeks.
+  - *Why not Base UI, the closest:* it equals React Aria on the keyboard and is cleaner under the CSP. But it has no
+    table and no date picker, and it does not say which screen readers it is tested with.
+  - *Why not Ark UI:* it is the cleanest in the browser, but it has no table, and it depends on 90 packages.
+  - *Parts.* They live in `ui/<Name>/` and wrap the library; product code never imports it (lint, FR-5). Plan 06
+    adds only what today's screens use (QR-8).
+  - *CSP.* The refused touch rule ships in our own stylesheet. Plan 06 either proves that the console stays clean
+    under the production CSP, or records the one refusal.
+  - *Axe's `aria-hidden-focus` while a searchable list is open.* The library hides the rest of the page from
+    screen readers on purpose. Plan 07's browser tests record it as an accepted exception, with that reason.
+- **Evidence:** measured 2026-09-11.
+  - *The spike.*
+    - A scratch Vite app: React 19.2.8 and Vite 8.2.2, the newest versions past the quarantine. One page per
+      library, each with the same four parts.
+    - Playwright 1.63 alpha, on its Chromium headless shell. axe-core 4.13.0 ran with the WCAG 2.0, 2.1 and 2.2
+      A and AA tags. Its target-size rule was left out, because the parts were unstyled.
+  - *Scenarios, following the WAI-ARIA Authoring Practices:*
+    - select: Tab reaches it, ArrowDown opens it, ArrowDown moves, "c" jumps to Cherry, Enter selects, and focus
+      returns;
+    - searchable list: typing "ch" leaves one option, then ArrowDown and Enter;
+    - menu: Enter opens it on its first item, ArrowDown moves, and Escape returns focus;
+    - dialog: Enter opens it, focus moves inside, the dialog is named by its title, Tab stays in the dialog, and
+      Escape returns focus.
+
+    Ariakit's dialog and the native one let Tab pass once through the browser's own controls, which the
+    Authoring Practices allow.
+  - *Rechecks.* The first run had three false failures, each caused by the test itself. Each was rechecked and
+    corrected before this table:
+    - focus had moved to the browser's own controls;
+    - Ark announces the active option through `aria-activedescendant`, which the test did not read;
+    - Base UI's `Combobox.Label` labels a trigger. Its input is labelled through `Field.Label`.
+  - *CSP.*
+    - The Caddyfile's header was served by `vite preview`, and violations were caught with the
+      `securitypolicyviolation` event.
+    - React Aria's `usePress` prepends one `<style>`, and sets its nonce when it finds one.
+    - Radix inserts them through `react-remove-scroll`, and a `<style>` in its select.
+    - Mantine inserts one through `react-remove-scroll`, in its modal.
+    - Base UI hoists a `<style>` for scrollbars; `disableStyleElements` switches it off.
+    - Reading the packages' code first gave wrong answers here (CC-09).
+  - *Docs:*
+    - React Aria's quality page gives the matrix of screen readers and browsers, and "localized strings for 30+
+      languages"; the package ships 34.
+    - Base UI's and Radix's accessibility pages.
+    - Mantine's unstyled page: "Mantine classes are not applied … Style props will work only with explicit
+      values".
+    - React Aria's getting-started page: styles come in plain CSS or Tailwind, copied by hand or added with the
+      shadcn CLI.
+  - *Registry and GitHub:* as in the table. Package counts were resolved from the registry's metadata, and no tree
+    has an install script.
+- **Wrong if:**
+  - React Aria's bundle pushes a page past plan 08's budget. Then Base UI, whose parts match one for one, except
+    the table;
+  - the table is rendered from TanStack Table's own markup, not React Aria's (D-06). Then React Aria's biggest
+    advantage shrinks, and Base UI's health and CSP result weigh more;
+  - the company's product is built on Radix, and this skeleton is meant to share its parts;
+  - a second browser engine fails a scenario that Chromium passed (plan 07 runs three).
+- **Where it leads:**
+  - *Gains:*
+    - keyboard, focus, screen-reader and touch behaviour come from a library tested with five screen readers;
+    - tables, trees and date pickers for a data-heavy product come from the same source;
+    - announcements in other languages are ready when i18n arrives (§10);
+    - the look stays ours, styled through state attributes.
+  - *Costs:*
+    - the largest JS of the candidates, about 68 kB gzip for four parts, which plan 08's budget watches;
+    - no npm provenance;
+    - a deviation from the company's Radix, explained in `ARCHITECTURE.md`;
+    - one CSP refusal to neutralise.
+  - *Growth path:*
+    - parts come from React Aria's plain-CSS examples, one module each (QR-17);
+    - the table follows D-06;
+    - right-to-left layouts and localized announcements follow i18n.
+
+### D-28 — How do we write the look, so the design can change without rewriting the screens?
+
+`Accepted` 2026-09-11 · needed by plan 06 · build now · judged by FR-5, QR-7, QR-12, QR-22, QR-11, QR-8, QR-24,
+QR-21, DR-1, QR-17 · split from D-07 at the author's review
+
+**What we are deciding.** The design will change: refreshed first, then made distinct as competitors appear (the
+author's premise, D-07). A redesign must be a change to a small set of named decisions, such as colours, spacing,
+type, corners and motion. It must not be a hunt through every screen. The question is how styles are written, and
+where those decisions, the design tokens, live.
+- Utility classes in the markup are fast to write and familiar. But each part's look is spread across long class
+  strings, and every page shares a single global stylesheet.
+- Stylesheets beside each part keep its look in one place, and a page ships only the styles it uses. But the rule
+  that only tokens are used needs a check of its own.
+
+It is decided now because plan 06 writes every part in the chosen way.
+
+**Not decided here:**
+- the library behind the parts' behaviour (D-07);
+- fonts and icons, which arrive with their first use;
+- a gallery for reviewing themes (D-14).
+
+**Candidates.** Three were built side by side. Each built the same two screens: a card with buttons and a badge,
+and a transactions table loaded as its own page. Each had two themes on the same tokens.
+
+Out:
+- *Runtime CSS-in-JS* inserts `<style>` while the app runs, and the CSP refuses it: styled-components 6.5.3, and
+  Emotion 11.14.0, whose last release was on 2024-12-09.
+- *Panda CSS 1.12.0* runs an `esbuild` install script, which our installs block. It has 153 packages and one
+  maintainer.
+- *StyleX 0.19.0* is pre-1.0, without provenance.
+
+| Criterion | A — Tailwind CSS 4.3.3, `cva` 0.7.1, `tailwind-merge` 3.6.0 | B — CSS Modules and CSS custom properties | C — vanilla-extract 1.21.2 |
+|---|---|---|---|
+| FR-5 tokens are the single source | ✅ `@theme`, with the default palette removed · ⚠️ arbitrary values (`bg-[#f00]`) bypass it, so a lint rule is needed | ⚠️ any stylesheet can write `#f00` or misspell a variable, so a gate in `check` must refuse both | ✅ a typed theme contract: a theme missing a token, or a style naming an unknown one, fails `typecheck` · ⚠️ raw values are still possible |
+| A redesign | ⚠️ tokens change in one place, but a part's look is its class strings, edited part by part | ✅ tokens in one file; each part's look in its own stylesheet | ✅ as B, typed |
+| Themes: light, dark, brands | ✅ a set of variables per `[data-theme]`, measured | ✅ measured | ✅ a class per theme, measured |
+| What ships on the first screen, measured | ⚠️ JS 9.49 kB, the class helpers; CSS 2.97 kB, Tailwind's reset included | ✅ JS 0.92 kB; CSS 0.87 kB | ✅ JS 0.85 kB; CSS 0.71 kB |
+| A page loads only its own styles | ❌ one global stylesheet: the table page brought no CSS of its own | ✅ the table page brought its own 0.22 kB | ✅ 0.20 kB |
+| DR-1 the kit can become a package | ⚠️ the app that uses it must scan the kit's source (`@source`); even the spike needed it | ✅ the CSS travels with each part | ✅ the compiled CSS travels with each part |
+| Markup, measured on the table page | ❌ 13.4 kB of class attributes; the table's Edit button carries 21 classes, 304 characters | ✅ 3.9 kB; 3 classes | ✅ 2.3 kB; 3 classes |
+| QR-12 focus ring and pointer by default | ✅ measured | ✅ measured | ✅ measured |
+| QR-22 the browser floor | ⚠️ Tailwind's own, fixed in its code: Chrome 111, Safari 16.4, Firefox 128 | ✅ Vite's target alone | ✅ Vite's target alone |
+| QR-24 record | ⚠️ the Vite plugin brings 17 packages with native binaries; `cva` and `tailwind-merge` have one maintainer each | ✅ nothing: Vite's own | ⚠️ the Vite plugin brings 90 packages; 2 human commits in the last month |
+| QR-21 the company's stack | ✅ all three named | ❌ | ❌ |
+| Familiar to a new hire | ✅ widely known | ✅ plain CSS | ⚠️ styles as TypeScript objects |
+| Cost of changing later | ⚠️ class strings rewritten part by part | ✅ plain CSS moves anywhere | ⚠️ styles are TypeScript, to be rewritten |
+
+- **Decision:** CSS Modules, with the design tokens as CSS custom properties.
+  - *Tokens.* They live in one file in `ui/`, in up to three tiers:
+    - raw values: the palette and the spacing scale;
+    - meaning: surface, text, accent, positive, negative, focus;
+    - a part's own, where a part needs one: the button's background, for example.
+
+    A theme is one more set of the meaning tier, under `[data-theme]`.
+  - *Parts.* Each part's look lives in its own `*.module.css`, beside it. It is styled through React Aria's state
+    attributes: `[data-focus-visible]`, `[data-pressed]`, `[data-selected]`.
+  - *Why not Tailwind, the company's choice:*
+    - a part's look is spread across class strings: 21 classes on one button;
+    - it takes 9.5 kB of JS to merge them;
+    - every page gets one global stylesheet;
+    - the kit cannot leave the app unless the app scans it.
+
+    That is the opposite of what we need: a design we will keep changing, and a kit we may share.
+  - *Why not vanilla-extract:* its typed contract is the strongest guarantee on tokens. But it brings 90 packages,
+    and its repository had two human commits in the last month. It stays on the growth path below.
+  - *Enforced (FR-5, QR-7):*
+    - a gate in `check`, proven by deliberate breaks, refuses a raw colour in any stylesheet outside the tokens
+      file, and any `var(--…)` that the tokens file does not define;
+    - `react/forbid-elements` refuses raw interactive elements outside `ui` (probed on oxlint 1.82.0);
+    - every interactive part carries a visible focus ring and the pointer cursor in its base style;
+    - spacing and type outside the scale are a review rule, named as such in `ARCHITECTURE.md`.
+  - *Browsers (QR-22):* one list, set as Vite's `build.target`. The stylesheets compile to it too.
+- **Evidence:** measured 2026-09-11, in D-07's spike app.
+  - *Measurements:*
+    - gzip sizes are read from the build manifest; everything else is read in Chromium;
+    - the theme switch changed the button's colour in all three;
+    - Tab gave a 2px solid focus ring, over the pointer cursor, in all three;
+    - the class attributes were counted on the table page.
+  - *Tailwind.* It scanned the whole spike until `source(none)` and `@source` limited it to its own folder. Its
+    floor comes from its compatibility page and from the targets in `@tailwindcss/node`; Vite 8's default target
+    is Firefox 114.
+  - *Registry:*
+    - `@vanilla-extract/css` 1.21.2 (2026-07-27) and `@vanilla-extract/vite-plugin` 5.2.6: 5 maintainers,
+      provenance;
+    - `styled-components` 6.5.3 (2026-08-15); `@emotion/react` 11.14.0 (2024-12-09);
+    - `@pandacss/dev` 1.12.0, whose `esbuild` has a `postinstall`;
+    - `@stylexjs/stylex` 0.19.0.
+  - *GitHub:* `vanilla-extract-css/vanilla-extract` had 2 human commits since 2026-08-11.
+- **Wrong if:**
+  - the company's team writes Tailwind everywhere, and this skeleton is meant to be continued by them as it is. Then A,
+    with the tokens in `@theme`;
+  - misspelled or misused tokens keep getting past the gate. Then C, whose contract types every token;
+  - parts drift apart visually as they multiply. Then part-tier tokens become mandatory.
+- **Where it leads:**
+  - *Gains:*
+    - a redesign changes the tokens file and the parts' stylesheets, never the screens;
+    - a new theme or brand is one more set of meaning tokens;
+    - each page loads only its own styles;
+    - the markup stays readable;
+    - there is no styling package at all;
+    - the kit can become a package, with its CSS.
+  - *Costs:*
+    - a small gate of our own, which keeps tokens the only source of colour;
+    - no utility shortcuts: a screen's layout is written in its own module stylesheet;
+    - a deviation from the company's Tailwind, explained in `ARCHITECTURE.md`;
+    - React Aria's plain-CSS examples have to be adapted to our tokens.
+  - *Growth path:*
+    - typed tokens, through vanilla-extract's contract or a TypeScript source that generates the tokens file, if
+      misspelled tokens become a real class of bug;
+    - a design tool's export that generates the tokens file;
+    - D-14 decides the gallery where themes are reviewed.
+
 ## Course corrections
 
 When evidence overturns an assumption — even one never written down — the earlier reasoning stays and
@@ -1986,6 +2228,17 @@ the correction is recorded here, dated, with what triggered it. This is the chai
   - The three versions leave the quarantine by themselves on 2026-09-16 and 2026-09-17.
   - What would close the gap is a check that fails while any locked version is younger than the quarantine,
     unless it is named in `minimumReleaseAgeExcludes` with a reason. That is for the author to decide.
+
+### CC-09 — Reading a package's code was assumed to show every style it injects · 2026-09-11
+
+- *Assumed:* D-07's first draft judged the kits against the CSP by searching their published files for
+  `createElement('style')`. It concluded that Radix inserts `<style>` and that Base UI and React Aria do not.
+- *Found:* the author rejected that draft on other grounds. The browser spike, run under the production CSP, then
+  showed two things the search had missed:
+  - Base UI renders a `<style>` through JSX, a React 19 hoisted style, which a setting switches off;
+  - React Aria inserts one from a hook, in a dependency the search never opened.
+- *Changed:* a claim about what code does at runtime is measured at runtime. D-07's CSP row comes from the
+  browser, under the Caddyfile's header, counting `securitypolicyviolation` events.
 
 ---
 
