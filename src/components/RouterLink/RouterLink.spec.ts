@@ -14,3 +14,14 @@ test('the router marks the current page, and a press navigates', async ({ mount 
   await expect(dashboard).toHaveAttribute('aria-current', 'page')
   await expect(transactions).not.toHaveAttribute('aria-current', 'page')
 })
+
+// Without the router's navigate, React Aria follows the link itself and the page loads again (plan 06). The
+// story's router keeps its history in memory, so a move within the app leaves the gallery's address alone; a
+// page load goes to the link's address instead, where the app itself renders a Dashboard link of its own.
+test('Enter moves within the app, as a click does', async ({ mount, page }) => {
+  const story = await mount('components/RouterLink/Navigation')
+  const dashboard = story.getByRole('link', { name: 'Dashboard' })
+  await dashboard.press('Enter')
+  await expect(dashboard).toHaveAttribute('aria-current', 'page')
+  await expect(page).toHaveURL(/\/playwright\/gallery\/index\.html$/)
+})
