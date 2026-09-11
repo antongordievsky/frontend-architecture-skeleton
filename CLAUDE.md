@@ -209,5 +209,7 @@ Requirements (Part I) are written once and change only with the author's agreeme
   container they start runs project code with write access to the tree and an open network. That gap
   is named, not closed: D-26, deferred. A commit that changes dependencies runs the Docker gate, so it is
   committed outside the sandbox, with the author's approval. So is a merge or branch switch that changes
-  `.claude/settings.json`: the sandbox refuses git's write to that file.
+  `.claude/settings.json` or a compose file: the sandbox refuses git's write to those. Such a switch stops
+  half-done, with the tree between two commits, so finish it outside the sandbox — `git checkout -- <file>`
+  for what it could not rewrite, then the merge again (found in plan 06).
 - Everything else in the AI layer is decided in D-15 and exists only with a consumer (QR-18).
