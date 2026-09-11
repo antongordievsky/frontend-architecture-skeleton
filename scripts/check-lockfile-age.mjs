@@ -59,13 +59,18 @@ const gitShow = (spec) => {
 // bun.lock is JSON with trailing commas. An entry is ["name@version", registry, metadata, integrity]; Bun
 // writes "" as the registry for the default one. An entry is identified by its version and its integrity,
 // so a hand edit that swaps the artifact behind a locked version counts as a change, and is checked.
+// The id is split where Bun splits it, at the first "@" after an optional scope (split_name_and_maybe_version
+// in Bun's dependency.rs), and only a plain package name and an exact version pass: an id the gate could
+// read differently from Bun (a URL hidden in the name, a suffix after the version) stops it.
+const packageName = /^(@[\w.-]+\/)?[\w.-]+$/
+const exactVersion = /^\d+\.\d+\.\d+(-[\w.-]+)?(\+[\w.-]+)?$/
 const lockedEntries = (text) => {
   const entries = new Map()
   if (text === null) return entries
   const lock = JSON.parse(text.replace(/,(\s*[}\]])/g, '$1'))
   for (const [key, [id, registry, , integrity]] of Object.entries(lock.packages ?? {})) {
-    const at = id.lastIndexOf('@')
-    if (at <= 0 || !/^\d+\.\d+\.\d+/.test(id.slice(at + 1))) {
+    const at = id.indexOf('@', id.startsWith('@') ? 1 : 0)
+    if (at <= 0 || !packageName.test(id.slice(0, at)) || !exactVersion.test(id.slice(at + 1))) {
       fail([
         `check-lockfile-age: ${key} is locked as "${id}", which is no registry version and cannot be checked`,
       ])
