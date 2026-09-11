@@ -1543,6 +1543,11 @@ Proving that tests catch what they claim to (QR-23). What teams at scale do:
     Its stories and gallery are Storybook's shape, so D-14 decides whether one set of stories serves both.
     Component tests need browsers, which `check`'s image lacks. Whether they run in pre-commit on the
     Playwright image, or only in the browser profile, is settled with the first component.
+    - *Settled 2026-09-11 with plan 06, agreed with its GREEN LIGHT:* component tests and screenshots run in
+      the `browser` service, on Microsoft's image (`docker compose run --rm browser`). Pre-push runs them
+      after `check`. Pre-commit does not: `check`'s image has no browsers, and the agent's sandbox cannot
+      start Docker on every commit. The orchestrator runs them before each commit that changes a part, a
+      story or a stylesheet, and the plan's log records it. Plan 07 adds the page tests to the same service.
   - *Browser tests (plan 07)* — `@playwright/test` against `web-prod` (D-12), in their own compose profile
     on Microsoft's image, pinned to the same version. Chromium, WebKit and Firefox: measured, the third
     engine costs seconds. `@axe-core/playwright` runs on every page test, and the transactions page gets
