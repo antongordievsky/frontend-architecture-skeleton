@@ -208,7 +208,13 @@ export default {
             check(node, node.source.value)
             routerLink(node)
           },
-          ExportAllDeclaration: (node) => check(node, node.source.value),
+          ExportAllDeclaration: (node) => {
+            check(node, node.source.value)
+            // `export * from '@tanstack/react-router'` would pass the router's Link on under another name.
+            if (node.source.value === ROUTER && from.module !== ROUTER_LINK) {
+              report(node, `the router's Link is drawn by ${ROUTER_LINK}: import RouterLink`)
+            }
+          },
           TSImportType: (node) => check(node, literal(node.source)),
           TSImportEqualsDeclaration: (node) =>
             node.moduleReference.type === 'TSExternalModuleReference' &&

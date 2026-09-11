@@ -52,13 +52,14 @@ const COLOUR_FUNCTION = /\b(rgba?|hsla?|hwb|lab|lch|oklab|oklch|color)\(/i
 // In a property that takes a colour, any other bare word may be a named colour (red, rebeccapurple), so only
 // these pass: the colour keywords that carry no colour, and the other words the shorthands take.
 const COLOUR_PROPERTY =
-  /^(color|background(-color)?|border(-(top|right|bottom|left|block|inline)(-(start|end))?)?(-color)?|outline(-color)?|fill|stroke|caret-color|accent-color|column-rule(-color)?|text-decoration(-color)?|text-emphasis(-color)?|box-shadow|text-shadow)$/
+  /^(color|background(-color|-image)?|border(-(top|right|bottom|left|block|inline)(-(start|end))?)?(-color)?|border-image(-source)?|mask(-image)?|outline(-color)?|fill|stroke|caret-color|accent-color|column-rule(-color)?|text-decoration(-color)?|text-emphasis(-color)?|box-shadow|text-shadow)$/
 const ALLOWED_WORDS = new Set(
   (
     'transparent currentcolor inherit initial unset revert revert-layer none ' +
     'solid dashed dotted double groove ridge inset outset hidden auto thin medium thick ' +
     'no-repeat repeat repeat-x repeat-y space round center top bottom left right cover contain ' +
-    'fixed scroll local padding-box border-box content-box text underline overline line-through wavy'
+    'fixed scroll local padding-box border-box content-box text underline overline line-through wavy ' +
+    'to from at in srgb oklch oklab hsl display-p3 longer shorter increasing decreasing hue alpha'
   ).split(' '),
 )
 const bareWords = (value) =>
@@ -66,7 +67,9 @@ const bareWords = (value) =>
     .replace(/var\([^)]*\)/g, ' ')
     .replace(/url\([^)]*\)/g, ' ')
     .replace(/"[^"]*"|'[^']*'/g, ' ')
-    .match(/(?<![\w.#-])[a-z][a-z-]*\b(?!\()/gi) ?? []
+    // A function's name is not a colour; its arguments may be, so only the name goes.
+    .replace(/[a-z][\w-]*\(/gi, ' ')
+    .match(/(?<![\w.#-])[a-z][a-z-]*\b/gi) ?? []
 
 const lineOf = (css, offset) => css.slice(0, offset).split('\n').length
 
