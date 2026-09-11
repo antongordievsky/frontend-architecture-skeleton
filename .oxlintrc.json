@@ -4,7 +4,7 @@
   "jsPlugins": ["./lint/layers.js"],
   "ignorePatterns": ["lint/fixtures/**"],
   "rules": {
-    "layers/boundaries": ["error", { "zones": ["app"] }],
+    "layers/boundaries": ["error", { "zones": ["app", "public"] }],
 
     "typescript/no-explicit-any": "error",
     "typescript/no-non-null-assertion": "error",

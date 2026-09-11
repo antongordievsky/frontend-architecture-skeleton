@@ -26,6 +26,9 @@ dist-ssr
 # The code index is derived from the tree and rebuilt on demand (QR-19).
 .codegraph/
 
+# The route generator's scratch files (D-05). The route tree itself is committed.
+.tanstack/
+
 # Environment files hold real values and never enter git; only the placeholder template does.
 .env
 .env.*

@@ -1,10 +1,15 @@
 import babel from '@rolldown/plugin-babel'
+import { tanstackRouter } from '@tanstack/router-plugin/vite'
 import react, { reactCompilerPreset } from '@vitejs/plugin-react'
 import { defineConfig } from 'vitest/config'
 
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
+    // D-05: writes the route tree from src/routes and splits each route's screen into its own chunk.
+    // It must come before React's plugin. Its options live in tsr.config.json, which `tsr generate`
+    // reads as well, so the drift gate and the build write the same tree.
+    tanstackRouter({ target: 'react' }),
     react(),
     // D-13: the official React Compiler. "all_errors" turns a component it cannot optimise into a
     // build error instead of a silently unoptimised component — e.g. a BigInt literal inside a
