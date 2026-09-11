@@ -316,7 +316,7 @@ Options are genuinely different approaches, and the company's own stack is alway
 | D-26 | When the agent starts a container, how much of the machine can that container reach? | DR-6, QR-11, QR-7, QR-8, C-2, FR-6 | deferred by the author — not what the take-home is about |
 | D-16 | How do we divide the code so everyone knows where things go, and the parts of the product stay apart? | FR-1, FR-2, DR-1, DR-4, DR-8, QR-8, QR-17, QR-21, QR-23 | plan 03 |
 | D-03 | When the server sends data, how do we make sure it is right before a screen shows it? (the generator itself moved to D-24, CC-01) | FR-3, QR-1, QR-2, QR-5, QR-9, DR-2, DR-5, DR-8, QR-8, QR-24, QR-21 | plan 04 |
-| D-08 | Representation of amounts and assets | QR-1, QR-2 | plan 04 |
+| D-08 | How do we hold money so that no amount is ever silently wrong? | QR-1, QR-2, QR-3, QR-8, QR-9, QR-21, QR-24 | plan 04 |
 | D-04 | Mocking strategy and the dataset generator | FR-3, QR-6, QR-11, C-2 | plan 04 |
 | D-17 | Authentication architecture (design for) | DR-2, QR-11 | plan 04 |
 | D-09 | Testing strategy and environments (unit, component/integration, e2e, browsers in Docker); proving tests fail — manual deliberate breaks vs mutation testing (input: Stryker 10.0.0 with a Vitest runner, measured 2026-09-10) | FR-6, QR-12, QR-22, QR-23 | plan 04 (first tests) |
@@ -1177,6 +1177,83 @@ The transport under the generated calls — the author asked why not `axios`, th
     plan 04; a second service (DR-5) is a
     second generated client behind the same transport, and streamed answers use `fetch`'s stream; a React
     Native app reuses `api` as it is, because nothing in it touches the DOM.
+
+### D-08 — How do we hold money so that no amount is ever silently wrong?
+
+`Accepted` 2026-09-11 · needed by plan 04 · build now · judged by QR-1, QR-2, QR-3, QR-8, QR-9, QR-21, QR-24
+
+**What we are deciding.** Every figure in a tax report is built from amounts: crypto with up to 18
+decimal places, fiat in cents. The browser's ordinary numbers keep about 16 significant digits and turn
+0.1 + 0.2 into 0.30000000000000004; a tax product can show neither. We decide how an amount is held in
+memory, what stops two different assets — or crypto and euros — from being added together, and where
+rounding and formatting happen. A ready-made money library brings tested arithmetic; a small module of our
+own brings nothing we do not use. It is decided now because the first page shows amounts.
+
+**Not decided here:**
+- where the server's strings become amounts — in the adapter (D-03);
+- tax rules and the rounding policy of reports — tax calculation is out of scope (§10);
+- fiat valuation at transaction time — it comes from the contract and the dataset (D-04);
+- a locale setting for the user — i18n is out of scope (§10).
+
+| Criterion | A — plain data and our own domain module | B — a decimal library (`decimal.js` 10.6.0) | C — a money library as the representation (`dinero.js` 2.0.2, `bigint`) | D — A's plain data, with `dinero.js` as the arithmetic engine inside domain functions |
+|---|---|---|---|---|
+| QR-2 integers in the smallest unit | ✅ `bigint` units, with the decimals attached | ❌ arbitrary decimals, not base units | ✅ `bigint` amount and exponent | ✅ |
+| QR-2 no digit lost | ✅ `1.123456789012345678` formatted exactly; through `Number` it became `1.1234567890123457` | ✅ `0.1 + 0.2 = 0.3` | ✅ `1.000000000000000002` | ✅ |
+| QR-1 two known assets, or an asset and fiat, fail to compile | ✅ both refused; with `NoInfer` removed the test failed (TS2578) | ❌ one `Decimal` type for everything | ✅ ETH + BTC refused (TS2345) | ✅ as A |
+| QR-1 assets that arrive as data | ⚠️ the compiler sees `string`; a runtime `Result` answers `asset-mismatch` | ❌ nothing checks | ⚠️ a runtime throw, "Objects must have the same currency" | ⚠️ as A |
+| The cache and rendering (D-03, D-13) | ✅ plain objects: an unchanged row keeps its identity across a refetch | ❌ every row replaced on every refetch | ❌ each amount carries functions: every row replaced | ✅ as A |
+| QR-9 formatting 10 000 amounts exactly | ✅ 7.5 ms (5.9 ms through lossy `Number`) | ❓ | ❓ | ✅ as A |
+| Rounding, allocation, conversion | ⚠️ written when first needed; `Intl` rounds half-even for display | ✅ | ✅ half-even, `allocate`, `convert` built in | ✅ from the engine |
+| QR-8, QR-24 what it adds | ✅ nothing; about 40 lines | ⚠️ 12.8 kB gzip; one maintainer; last release 2025-07 | ✅ 1.5 kB gzip; provenance; one maintainer; last release 2026-03 | ⚠️ C's package, and a conversion each way |
+| Cost of changing later | ✅ D is additive: the engine arrives behind domain functions and the data keeps its shape | ❌ `Decimal` objects spread through the screens | ⚠️ functions in the cache are hard to take back | ✅ |
+| QR-21 the company's stack | ❓ their money code is not public; the posting names "blockchain libraries" — `viem`'s `formatUnits` does A's conversion, from a 27.9 MB package with eight dependencies | ❓ | ❓ | ❓ |
+
+- **Decision:** amounts are plain, read-only data in the smallest unit, in `domain/amount.ts` —
+  `CryptoAmount<A>` is `{ kind: 'crypto', asset, decimals, units: bigint }` and `FiatAmount<C>` is
+  `{ kind: 'fiat', currency, minor: bigint }`. No `number` ever holds an amount.
+  - *Identity* — `asset` is the server's asset id, never a ticker. Decimals travel with every amount, so
+    precision is never looked up by symbol (§9, per-asset precision).
+  - *Arithmetic* — only through domain functions typed with `NoInfer`. Two known assets, or an asset and
+    fiat, fail to compile; assets that arrive as data return a `Result` with `asset-mismatch`.
+  - *Rounding* — only in a named domain function with an explicit mode. Formatting never changes a stored
+    value.
+  - *Formatting* — at the render boundary. `formatAmount` builds an exact decimal string and hands it to a
+    cached `Intl.NumberFormat`; a currency's minor digits come from `Intl`, so there is no currency table.
+  - *The type-level test (QR-1)* — a file of `@ts-expect-error` lines that `tsc` checks in `check`, so it
+    needs no test runner. BigInt literals stay in `domain` (D-13).
+- **Evidence:** measured 2026-09-11 on TypeScript 7.0.2 under our strict flags, Node 24.21.0, Bun 1.4.2.
+  - *Types* — two known assets, an asset and fiat, a fractional `number` and a mutation each failed to
+    compile, and each `@ts-expect-error` was needed; assets typed as `string` compiled, and the runtime
+    returned `{ ok: false, error: 'asset-mismatch' }`; the `switch` over `kind` was exhaustive. With
+    `NoInfer` removed, `tsc` failed with TS2578 on the two-assets line.
+  - *Formatting* — `Intl.NumberFormat` with `maximumFractionDigits: 18` printed a decimal string exactly
+    (`1,234,567.123456789012345678`) and rounded half-even on request; minor digits EUR 2, JPY 0, KWD 3;
+    `123456n` minor units printed as `1.234,56 €` in `de-DE`. String input was measured on V8 only.
+  - *`decimal.js`* — 33.2 kB minified (12.8 kB gzip); TanStack Query's structural sharing replaced an
+    unchanged row; `JSON.stringify` works through its `toJSON`.
+  - *`dinero.js`* — ETH + BTC refused at compile time (TS2345) and at runtime; `toDecimal` exact; an
+    amount's keys are `calculator, formatter, create, toJSON`; `JSON.stringify` throws on its `bigint`;
+    structural sharing replaced an unchanged row; 3.6 kB minified (1.5 kB gzip).
+  - *Registry* — `decimal.js` 10.6.0 (2025-07-06, one maintainer, no provenance); `big.js` 7.0.1
+    (2025-04-21, no bundled types); `bignumber.js` 11.1.5 (2026-07-05); `dinero.js` 2.0.2 (2026-03-13,
+    one maintainer, provenance); `viem` 2.56.3 (27.9 MB unpacked, eight dependencies).
+- **Wrong if:**
+  - arithmetic beyond addition arrives — allocation, currency conversion, tax rounding — then D:
+    `dinero.js` behind the domain functions, with the data unchanged;
+  - exact string formatting misbehaves on the second browser engine (QR-22) — then `formatAmount` groups
+    digits itself;
+  - the backend identifies assets by ticker only — then the asset id becomes ticker plus chain, agreed in
+    the contract.
+- **Where it leads:**
+  - *Gains* — an amount cannot lose a digit, or be added to the wrong asset, without a compile error or
+    a typed failure; the cache holds plain data, so unchanged rows keep their identity and memoised rows
+    stay cheap; nothing to install.
+  - *Costs* — arithmetic helpers are ours to write and test, one at a time; assets known only at runtime
+    are checked at runtime, not by the compiler, which `ARCHITECTURE.md` names (QR-7); a cache of `bigint`
+    needs a serializer before it can be persisted (D-03).
+  - *Growth path* — `dinero.js` as the engine once allocation or conversion arrives (D); a branded
+    `AssetId` when the contract grows asset ids; the type-level test moves to D-09's runner if that offers
+    one.
 
 ## Course corrections
 
