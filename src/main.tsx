@@ -4,9 +4,13 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { createQueryClient } from '@/api/queryClient.ts'
 import './index.css'
-import { createAppRouter } from './router.ts'
+import { createAppRouter, endSession } from './router.ts'
 
-const queryClient = createQueryClient()
+// The query client signals a 401; the router answers it. Each needs the other, so the signal is a
+// closure that runs only after both exist.
+const queryClient = createQueryClient({
+  onUnauthorized: () => void endSession(router, queryClient),
+})
 const router = createAppRouter(queryClient)
 
 const rootElement = document.getElementById('root')

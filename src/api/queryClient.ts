@@ -1,4 +1,4 @@
-import { QueryClient } from '@tanstack/react-query'
+import { QueryCache, QueryClient } from '@tanstack/react-query'
 import { ApiError } from './transport.ts'
 
 // D-03: the cache policy's one home. Only failures that may pass on their own are retried: the network,
@@ -8,8 +8,20 @@ export const isRetryable = (error: unknown): boolean =>
   (error.problem.kind === 'network' ||
     (error.problem.kind === 'http' && error.problem.status >= 500))
 
-export const createQueryClient = (): QueryClient =>
+// D-17, D-18: a 401 from any query means the session has ended. api cannot import the router, so it
+// raises one signal and the shell answers it (router.ts, endSession).
+export const isUnauthorized = (error: unknown): boolean =>
+  error instanceof ApiError && error.problem.kind === 'http' && error.problem.status === 401
+
+export type QueryClientOptions = { readonly onUnauthorized?: () => void }
+
+export const createQueryClient = ({ onUnauthorized }: QueryClientOptions = {}): QueryClient =>
   new QueryClient({
+    queryCache: new QueryCache({
+      onError: (error) => {
+        if (isUnauthorized(error)) onUnauthorized?.()
+      },
+    }),
     defaultOptions: {
       queries: { retry: (failures, error) => failures < 3 && isRetryable(error) },
     },
