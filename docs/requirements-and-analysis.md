@@ -321,7 +321,7 @@ Options are genuinely different approaches, and the company's own stack is alway
 | D-04 | Where does the demo data come from, and how do we keep it out of what users download? | FR-3, QR-6, QR-11, C-2, QR-5, QR-8, QR-9, QR-24, QR-21 | plan 04 |
 | D-17 | How do people sign in, and what does the browser keep so that nobody can steal a session? (design for) | DR-2, QR-11, DR-3, DR-8 | plan 04 |
 | D-09 | How do we know the product works, and that our tests would notice if it stopped? (amended: mutation testing deferred as future work) | FR-6, QR-12, QR-22, QR-23, QR-4, QR-8, QR-21, QR-24 | plan 04 (first tests) |
-| D-05 | Routing | FR-4, QR-3, QR-21 | plan 05 |
+| D-05 | How does each address lead to its screen, and how do we stop links and filters in the address from breaking? | FR-4, QR-3, QR-4, FR-2, QR-17, QR-20, DR-1, DR-3, QR-21, QR-24 | plan 05 |
 | D-18 | Authorization model (design for, guard seam) | DR-3, QR-17 | plan 05 |
 | D-07 | UI foundation: kit, styling model, tokens | FR-5, QR-12, QR-21, QR-22 | plan 06 |
 | D-14 | Storybook and visual regression | FR-5, QR-8, QR-21 | plan 06 |
@@ -1607,6 +1607,114 @@ Proving that tests catch what they claim to (QR-23). What teams at scale do:
   - *Growth path* — the mutation run moves into CI on each change, commenting on survivors as Google's
     does (D-11); property-based tests with `fast-check` when D-08's arithmetic grows beyond addition;
     jsdom for a component test only if a real engine proves too slow for it.
+
+### D-05 — How does each address lead to its screen, and how do we stop links and filters in the address from breaking?
+
+`Accepted` 2026-09-11 · needed by plan 05 · build now · judged by FR-4, QR-3, QR-4, FR-2, QR-17, QR-20, DR-1,
+DR-3, QR-21, QR-24
+
+**What we are deciding.** Every screen has an address, and users share and bookmark them: a list filtered to
+trades, one transaction's details. An address that leads nowhere, or a filter in it that a screen misreads,
+is a bug the user sees first, because by default nothing checks addresses. One kind of router checks every
+link and every filter against the list of screens when the code is built. The other trusts whatever the
+address holds and leaves each screen to check it. Inside the first there is a second choice: the list of
+screens is written by hand in one place, or a tool reads it from the files, which means less to write but one
+more generated file to keep. It is decided now because plan 05 builds the shell, and every screen hangs on it.
+
+**Not decided here:**
+- what the transactions screen keeps in the address, in memory or on the server (D-06);
+- who may open which screen, and the guard that enforces it (D-18);
+- the sign-in page and the reaction to a lost session (D-17, designed for);
+- what the screens look like (D-07).
+
+| Criterion | A — TanStack Router, route files read by its generator | B — TanStack Router, the route tree written by hand in the shell | C — React Router 8, framework mode (its Vite plugin and generated route types) |
+|---|---|---|---|
+| FR-4 route and search parameters typed | ✅ both, checked by `typecheck`: a link to a missing screen or a filter of the wrong type fails | ✅ the same types, from the hand-written tree | ⚠️ path parameters typed by its typegen; search parameters are a plain `URLSearchParams` in every mode |
+| QR-3 one source of types; input validated at the edge | ✅ a filter is a `zod/mini` schema passed as is (Standard Schema, spiked) | ✅ as A | ⚠️ each screen parses the query string itself |
+| QR-4 routes code-split; an error boundary in the shell | ✅ `autoCodeSplitting` splits each route's screen · ❓ through D-16's `index.ts` files, counted in the plan | ⚠️ a lazy wrapper per page, written by hand | ✅ route modules split by the plugin |
+| FR-2 D-16's structure holds | ⚠️ a new `routes/` folder of thin files that reach a page only through its zone's `index.ts`; one row in the layer map | ✅ exactly D-16's `AppRouter.tsx` | ❌ a route module exports the screen's loader and component, so page code moves into the route tree, the option D-16 rejected |
+| QR-17 "add a page" | ✅ a page folder, a line in the zone's `index.ts`, a route file; the tree writes itself | ⚠️ as A, plus a route object and its place in its parent's `children` | ✅ |
+| QR-20 generators over hand-written code | ✅ the router's own generator writes the tree | ❌ hand-writes what the generator produces; the router's docs call it "not recommended for most applications" | ✅ its typegen |
+| DR-3 a place for the guard | ✅ `beforeLoad` on a layout route, with a typed context that holds the query client | ✅ as A | ⚠️ middleware and loaders · ❓ a typed context |
+| DR-1 the public zone moves to static or server rendering | ✅ TanStack Start builds on the same route files | ⚠️ the routes move to files first | ✅ SPA, server and static rendering per route, built in |
+| QR-21 the company's stack | ✅ the company's router, in its documented default · ❓ how the company writes its routes | ✅ the company's router | ❌ a second router beside the company's |
+| QR-24 supply chain | ⚠️ two packages; the plugin brings Babel 7 and `unplugin` | ✅ one package | ⚠️ two packages; the plugin brings 23 dependencies |
+| Cost today | ⚠️ the plugin in `vite.config.ts`; a generated file committed and checked for drift, as the contract is; a layer-map row with its fixture cases | ✅ one file | ❌ a framework plugin that owns the app's entry and folder layout |
+| Cost of changing later | ✅ to B and back: file routes and code routes share one API | ✅ as A | ⚠️ leaving it rewrites every link and every hook |
+
+- **Decision:** TanStack Router with file-based routes. Its generator builds the route tree from thin route
+  files in `src/routes/`, each of which reaches its screen only through the zone's `index.ts`. Every path
+  and search parameter is validated by a schema at its route and typed in every link.
+  - *Route files belong to the shell.* They hold the path, the search schema, the guard and the data
+    prefetch; the screen stays in its page module (D-16). The layer map learns `routes/` as part of the
+    shell, with fixture cases.
+  - *Search parameters* are a `zod/mini` schema with `catch`: a malformed filter in a shared link falls back
+    to its default instead of breaking the screen, as the router's docs recommend.
+  - *Data.* The router's typed context carries the query client. A route's loader prefetches through the
+    adapter's `queryOptions` (D-03), so the route and the screen read one cache entry.
+  - *Not found and errors.* The root route's `notFoundComponent` answers unknown addresses. The shell holds
+    an error boundary (QR-4).
+  - *The generated tree* is committed, as the router's FAQ says. `check` regenerates it into a scratch copy
+    and compares, as it does for the contract.
+- **Evidence:** measured and read 2026-09-11.
+  - *Registry:*
+    - `@tanstack/react-router` 1.170.35 (2026-09-10). The newest past the 7-day quarantine is 1.170.32
+      (2026-08-22). 3 maintainers; peers React ≥ 18.
+    - `@tanstack/router-plugin` 1.168.37; past the quarantine, 1.168.35 (2026-08-22), whose peer is
+      `@tanstack/react-router ^1.170.32`. It accepts Vite 8 and depends on `@babel/core ^7.29.7`,
+      `unplugin ^3.3.0` and `zod ^4.5.4` (ours is 4.5.4).
+    - `@tanstack/router-cli` 1.167.35 runs the same generator outside Vite (`tsr generate`).
+    - `@tanstack/react-start` 1.168.52.
+    - `react-router` 8.3.1 (2026-08-28), 2 maintainers, peers React ≥ 19.2.7. `@react-router/dev` 8.3.1
+      has 23 dependencies and 1 maintainer.
+  - *TanStack's docs,* on `main` in the TanStack/router repository:
+    - code-based routing "is not recommended for most applications";
+    - file-based routing "is the preferred and recommended way";
+    - the FAQ says to commit `routeTree.gen.ts`: "part of your application's runtime, not a build artifact";
+    - the Vite plugin goes before `@vitejs/plugin-react`, and defaults to `./src/routes` and
+      `./src/routeTree.gen.ts`;
+    - "With Zod v4, you should directly use the schema in `validateSearch`", and `catch` keeps its types;
+    - "A route guard is not a data authorization boundary". A route's `beforeLoad` runs before its
+      children's.
+  - *React Router's docs,* on `main` in the remix-run/react-router repository:
+    - typed params and a typed `href` exist in framework mode only (`start/modes.md`), through
+      `react-router typegen` (`explanation/type-safety.md`);
+    - `useSearchParams` is the same in every mode.
+    - TanStack's own comparison table marks React Router's search params as not type-safe; it is a
+      vendor's table and is cited only where React Router's docs agree.
+  - *Spike:* a `zod/mini` 4.5.4 object carries `~standard` (vendor `zod`, version 1). It validates
+    `{ kind: 'trade' }`, reports an issue for `'nope'`, and with `z.catch` falls back instead.
+  - *Not measured:*
+    - the bundle size of either router. Plan 08's budget measures the one chosen;
+    - whether automatic splitting separates pages reached through a zone's `index.ts`. Plan 05 counts the
+      chunks.
+- **Wrong if:**
+  - pages reached through a zone's `index.ts` land in one chunk. Then the zone's `index.ts` exports a lazy
+    wrapper per page, as in B, and automatic splitting is switched off;
+  - the plugin's Babel 7 pass and the React Compiler's Babel 8 pass conflict in one build. Then B, with no
+    plugin;
+  - the company's app turns out to write its routes in code. Then B, to match them, at the cost of one file;
+  - the public site is built by a content platform rather than by us. Then DR-1's path is a separate site,
+    and Start's advantage in the table disappears.
+- **Where it leads:**
+  - *Gains:*
+    - a broken link or a filter of the wrong type fails `typecheck`, before a user meets it;
+    - a filter is validated once, at its route, so no screen parses a query string;
+    - each screen is its own chunk without anyone writing it;
+    - the guard (D-18) and the reaction to a lost session (D-17) each have a place: `beforeLoad` and the
+      router's navigation;
+    - the public zone has a path to server or static rendering on the same routes.
+  - *Costs:*
+    - a generated file in the tree, and one more drift step in `check`;
+    - a build plugin that runs Babel 7 beside the Compiler's Babel 8;
+    - a screen appears in two places, its page module and its route file, which the "add a page" recipe
+      names;
+    - the router releases weekly, so the quarantine keeps us up to two weeks behind.
+  - *Growth path:*
+    - D-06 puts the table's sort, filter and cursor into the transactions route's search schema;
+    - D-18's guard becomes a `beforeLoad` on a zone's layout route;
+    - the public zone moves to Start with its own entry (D-16);
+    - virtual file routes, if the file convention ever fights D-16.
 
 ## Course corrections
 
