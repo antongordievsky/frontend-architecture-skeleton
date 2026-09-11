@@ -1,6 +1,7 @@
 // CC-08, D-23: a version younger than the quarantine cannot enter the lockfile. Bun's resolver already
 // refuses one; this checks the lockfile itself, whatever wrote it: a warm cache (CC-02), another tool, a
-// hand edit. Only the versions a commit adds are checked, because a locked version was checked when it came.
+// hand edit. Only the entries a commit adds or changes are checked, because a locked entry was checked
+// when it came.
 //
 //   node scripts/check-lockfile-age.mjs                    what the staged bun.lock adds to HEAD's
 //   node scripts/check-lockfile-age.mjs --all              every locked version (the update recipe, QR-25)
@@ -39,35 +40,51 @@ const excluded = new Set(
   ].map((m) => m[1]),
 )
 
+// Only a lockfile that does not exist reads as empty: no HEAD yet, or no lockfile in it or in the index.
+// Any other failure stops the gate, so a lockfile git could not read never passes unchecked.
 const gitShow = (spec) => {
   try {
     return execFileSync('git', ['show', spec], {
       encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'ignore'],
+      stdio: ['ignore', 'pipe', 'pipe'],
       maxBuffer: 64 * 1024 * 1024,
     })
-  } catch {
-    // No HEAD yet, or no lockfile in it: everything the lockfile holds is added.
-    return null
+  } catch (e) {
+    const said = String(e.stderr ?? '')
+    if (/does not exist|invalid object name 'HEAD'|bad revision 'HEAD'/.test(said)) return null
+    return fail([`check-lockfile-age: git could not read ${spec}: ${said.trim() || e.message}`])
   }
 }
 
-// bun.lock is JSON with trailing commas. Each entry starts with "name@version".
-const lockedVersions = (text) => {
-  const ids = new Set()
-  if (text === null) return ids
+// bun.lock is JSON with trailing commas. An entry is ["name@version", registry, metadata, integrity]; Bun
+// writes "" as the registry for the default one. An entry is identified by its version and its integrity,
+// so a hand edit that swaps the artifact behind a locked version counts as a change, and is checked.
+const lockedEntries = (text) => {
+  const entries = new Map()
+  if (text === null) return entries
   const lock = JSON.parse(text.replace(/,(\s*[}\]])/g, '$1'))
-  for (const [key, entry] of Object.entries(lock.packages ?? {})) {
-    const id = entry[0]
+  for (const [key, [id, registry, , integrity]] of Object.entries(lock.packages ?? {})) {
     const at = id.lastIndexOf('@')
     if (at <= 0 || !/^\d+\.\d+\.\d+/.test(id.slice(at + 1))) {
       fail([
         `check-lockfile-age: ${key} is locked as "${id}", which is no registry version and cannot be checked`,
       ])
     }
-    ids.add(id)
+    if (registry !== '') {
+      fail([
+        `check-lockfile-age: ${key} resolves from ${registry}, not the default registry, so its age cannot be checked`,
+      ])
+    }
+    if (typeof integrity !== 'string' || integrity === '') {
+      fail([`check-lockfile-age: ${key} has no integrity hash`])
+    }
+    entries.set(`${id} ${integrity}`, {
+      name: id.slice(0, at),
+      version: id.slice(at + 1),
+      integrity,
+    })
   }
-  return ids
+  return entries
 }
 
 const headText = args.head
@@ -80,44 +97,49 @@ const baseText = args.all
   : args.base
     ? readFileSync(args.base, 'utf8')
     : gitShow('HEAD:bun.lock')
-const base = lockedVersions(baseText)
-const added = [...lockedVersions(headText)].filter((id) => !base.has(id))
+const base = lockedEntries(baseText)
+const added = [...lockedEntries(headText)]
+  .filter(([key]) => !base.has(key))
+  .map(([, entry]) => entry)
 if (added.length === 0) {
   console.log('check-lockfile-age: the lockfile adds no version')
   process.exit(0)
 }
 
-const versionsByName = new Map()
-for (const id of added) {
-  const at = id.lastIndexOf('@')
-  const name = id.slice(0, at)
-  versionsByName.set(name, [...(versionsByName.get(name) ?? []), id.slice(at + 1)])
-}
+const entriesByName = new Map()
+for (const entry of added)
+  entriesByName.set(entry.name, [...(entriesByName.get(entry.name) ?? []), entry])
 
 const now = Date.now()
 const young = []
 const waived = []
 const unchecked = []
-const queue = [...versionsByName.keys()]
+const queue = [...entriesByName.keys()]
 const worker = async () => {
   for (let name = queue.shift(); name !== undefined; name = queue.shift()) {
-    let time
+    let doc
     try {
       const res = await fetch(`${args.registry}/${name.replace('/', '%2f')}`, {
         headers: { accept: 'application/json' },
       })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      time = (await res.json()).time ?? {}
+      doc = await res.json()
     } catch (e) {
       unchecked.push(
         `  ${name}: ${e.message}${e.cause ? ` (${e.cause.code ?? e.cause.message})` : ''}`,
       )
       continue
     }
-    for (const version of versionsByName.get(name)) {
-      const published = Date.parse(time[version])
+    for (const { version, integrity } of entriesByName.get(name)) {
+      const published = Date.parse(doc.time?.[version])
       if (Number.isNaN(published)) {
         unchecked.push(`  ${name}@${version}: the registry gives no publish time`)
+        continue
+      }
+      if (doc.versions?.[version]?.dist?.integrity !== integrity) {
+        unchecked.push(
+          `  ${name}@${version}: the locked integrity is not the one the registry publishes`,
+        )
         continue
       }
       const age = (now - published) / 1000
