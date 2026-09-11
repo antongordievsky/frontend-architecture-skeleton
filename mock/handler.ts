@@ -1,6 +1,6 @@
 // D-04: the stand-in for the backend, as one Web-standard function. Plan 07 serves it with Bun behind /api;
 // until then tests plug it straight into `fetch`. It answers the contract's endpoints and nothing else.
-import type { TransactionPage } from '../src/api/generated/model/index.ts'
+import { ListTransactionsParams, type TransactionPage } from '../src/api/generated/model/index.ts'
 import { generateTransactions } from './dataset.ts'
 
 export type MockOptions = {
@@ -42,10 +42,19 @@ export const createHandler = (options: MockOptions = {}) => {
     if (request.method !== 'GET' || url.pathname !== '/api/transactions') {
       return problem(404, 'Not found')
     }
-    const kind = url.searchParams.get('kind')
+    // The contract's own schema judges the query, so the stand-in refuses what the real server would —
+    // a limit of 0 would otherwise page forever.
+    const query = ListTransactionsParams.safeParse({
+      cursor: url.searchParams.get('cursor') ?? undefined,
+      limit: url.searchParams.has('limit') ? Number(url.searchParams.get('limit')) : undefined,
+      kind: url.searchParams.get('kind') ?? undefined,
+    })
+    if (!query.success) return problem(400, 'Invalid query')
+    const { cursor = '0', limit, kind } = query.data
+    // Opaque to the client; here it is an offset into the dataset.
+    if (!/^\d+$/.test(cursor)) return problem(400, 'Invalid cursor')
     const rows = kind ? dataset.filter((t) => t.kind === kind) : dataset
-    const start = Number(url.searchParams.get('cursor') ?? 0)
-    const limit = Math.min(Number(url.searchParams.get('limit') ?? 50), 200)
+    const start = Number(cursor)
     const items = rows.slice(start, start + limit)
     const page: TransactionPage =
       start + limit < rows.length ? { items, nextCursor: String(start + limit) } : { items }

@@ -24,6 +24,21 @@ describe('the stand-in handler', () => {
     expect(page.items.every((t) => t.kind === 'trade')).toBe(true)
   })
 
+  test.each([
+    'limit=0',
+    'limit=-5',
+    'limit=201',
+    'limit=1.5',
+    'limit=abc',
+    'cursor=abc',
+    'cursor=-1',
+    'kind=staking',
+  ])('refuses a query the contract forbids: %s', async (query) => {
+    const response = await get(`/api/transactions?${query}`)
+    expect(response.status).toBe(400)
+    expect(response.headers.get('content-type')).toBe('application/problem+json')
+  })
+
   test('answers what it does not know with a Problem', async () => {
     const response = await get('/api/unknown')
     expect(response.status).toBe(404)
