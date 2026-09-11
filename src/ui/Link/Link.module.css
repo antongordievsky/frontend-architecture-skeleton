@@ -1,0 +1,26 @@
+/* D-28: styled through React Aria's state attributes; every value is a token. */
+.link {
+  border-radius: var(--radius-sm);
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+  cursor: pointer;
+  outline: none;
+}
+
+.link[data-hovered] {
+  color: var(--accent-hover);
+}
+
+/* QR-12: the ring shows for the keyboard only, never for a mouse press. */
+.link[data-focus-visible] {
+  outline: var(--focus-width) solid var(--focus);
+  outline-offset: var(--focus-offset);
+}
+
+/* The page the user is on: named by aria-current, so a screen reader hears it too. */
+.link[aria-current="page"] {
+  color: var(--text);
+  font-weight: var(--weight-bold);
+  text-decoration: none;
+}

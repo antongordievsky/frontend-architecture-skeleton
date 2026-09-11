@@ -1,0 +1,5 @@
+/* D-14: room around a story, so that a focus ring is inside the screenshot of #root. */
+#root {
+  display: inline-block;
+  padding: var(--space-4);
+}

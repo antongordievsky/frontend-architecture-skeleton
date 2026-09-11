@@ -1,0 +1,39 @@
+/* D-28: styled through React Aria's state attributes; every value is a token. */
+.button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  border: 0;
+  border-radius: var(--radius-md);
+  font: inherit;
+  font-weight: var(--weight-medium);
+  color: var(--on-accent);
+  background: var(--accent);
+  cursor: pointer;
+  outline: none;
+  transition: background-color var(--duration-fast);
+}
+
+.button[data-hovered],
+.button[data-pressed] {
+  background: var(--accent-hover);
+}
+
+/* QR-12: the ring shows for the keyboard only, never for a mouse press. */
+.button[data-focus-visible] {
+  outline: var(--focus-width) solid var(--focus);
+  outline-offset: var(--focus-offset);
+}
+
+.button[data-disabled] {
+  color: var(--on-disabled);
+  background: var(--disabled);
+  cursor: not-allowed;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .button {
+    transition: none;
+  }
+}

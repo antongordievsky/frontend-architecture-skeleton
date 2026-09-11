@@ -7,6 +7,9 @@
     <title>Tallyfolio</title>
   </head>
   <body>
+    <!-- D-07: React Aria's usePress inserts an inline <style> unless an element with this id exists, and the CSP
+         refuses inline styles. Its rule ships in src/ui/base.css instead. -->
+    <div id="react-aria-pressable-style" hidden></div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

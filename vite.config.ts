@@ -21,6 +21,10 @@ export default defineConfig({
     // component, which belongs in the domain anyway (QR-2).
     babel({ presets: [reactCompilerPreset({ panicThreshold: 'all_errors' })] }),
   ],
+  // D-14: the dev server pre-bundles what the app, the story gallery and every story import. By default it
+  // crawls index.html alone, and the gallery reaches stories through import.meta.glob, so a package first
+  // used by a story was found mid-test and the page reloaded under it (measured in plan 06).
+  optimizeDeps: { entries: ['index.html', 'playwright/gallery/index.html', 'src/**/*.story.tsx'] },
   // D-16: `@/` means src/, read from tsconfig's `paths`, so the alias has one definition.
   resolve: { tsconfigPaths: true },
   // D-09: Vitest runs logic in Node, with no page; anything that renders is Playwright's.

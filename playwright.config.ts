@@ -17,7 +17,8 @@ export default defineConfig({
     '{testDir}/{testFileDir}/__screenshots__/{arg}-{projectName}-{platform}{ext}',
   use: { baseURL: gallery, serviceWorkers: 'block' },
   webServer: {
-    command: 'node_modules/.bin/vite --port 5173 --strictPort',
+    // --force: pre-bundle afresh on every run, so a cache made before a story existed is never reused.
+    command: 'node_modules/.bin/vite --port 5173 --strictPort --force',
     url: gallery,
     reuseExistingServer: false,
   },

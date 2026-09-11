@@ -7,13 +7,20 @@ import { flushSync } from 'react-dom'
 import { createRoot, type Root } from 'react-dom/client'
 import '@/ui/tokens.css'
 import '@/ui/base.css'
+import './gallery.css'
 
 type Story = ComponentType<Record<string, unknown>>
 type MountParams = { readonly story: string; readonly props?: Record<string, unknown> }
 
 // Vite reads the glob statically, relative to this file, which is why the gallery is ours to own.
 const stories = import.meta.glob<Record<string, Story | undefined>>('../../src/**/*.story.tsx')
-const idOf = (file: string) => file.replace(/^(\.\.\/)+src\//, '').replace(/\.story\.tsx$/, '')
+// A part lives in a folder of its own name (D-16), so `ui/Button/Button.story.tsx` is `ui/Button`, not
+// `ui/Button/Button`.
+const idOf = (file: string) =>
+  file
+    .replace(/^(\.\.\/)+src\//, '')
+    .replace(/\.story\.tsx$/, '')
+    .replace(/([^/]+)\/\1$/, '$1')
 
 // A story id is the file's path under src without `.story.tsx`, then the export: `ui/Button/Primary`.
 // Any unique trailing part of the path works too: `Button/Primary`.
