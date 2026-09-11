@@ -317,7 +317,7 @@ Options are genuinely different approaches, and the company's own stack is alway
 | D-16 | How do we divide the code so everyone knows where things go, and the parts of the product stay apart? | FR-1, FR-2, DR-1, DR-4, DR-8, QR-8, QR-17, QR-21, QR-23 | plan 03 |
 | D-03 | When the server sends data, how do we make sure it is right before a screen shows it? (the generator itself moved to D-24, CC-01) | FR-3, QR-1, QR-2, QR-5, QR-9, DR-2, DR-5, DR-8, QR-8, QR-24, QR-21 | plan 04 |
 | D-08 | How do we hold money so that no amount is ever silently wrong? | QR-1, QR-2, QR-3, QR-8, QR-9, QR-21, QR-24 | plan 04 |
-| D-04 | Mocking strategy and the dataset generator | FR-3, QR-6, QR-11, C-2 | plan 04 |
+| D-04 | Where does the demo data come from, and how do we keep it out of what users download? | FR-3, QR-6, QR-11, C-2, QR-5, QR-8, QR-9, QR-24, QR-21 | plan 04 |
 | D-17 | Authentication architecture (design for) | DR-2, QR-11 | plan 04 |
 | D-09 | Testing strategy and environments (unit, component/integration, e2e, browsers in Docker); proving tests fail — manual deliberate breaks vs mutation testing (input: Stryker 10.0.0 with a Vitest runner, measured 2026-09-10) | FR-6, QR-12, QR-22, QR-23 | plan 04 (first tests) |
 | D-05 | Routing | FR-4, QR-3, QR-21 | plan 05 |
@@ -1254,6 +1254,101 @@ own brings nothing we do not use. It is decided now because the first page shows
   - *Growth path* — `dinero.js` as the engine once allocation or conversion arrives (D); a branded
     `AssetId` when the contract grows asset ids; the type-level test moves to D-09's runner if that offers
     one.
+
+### D-04 — Where does the demo data come from, and how do we keep it out of what users download?
+
+`Accepted` 2026-09-11 · needed by plan 04 · build now · judged by FR-3, QR-6, QR-11, C-2, QR-5, QR-8, QR-9,
+QR-24, QR-21
+
+**What we are deciding.** There is no backend yet, so every screen draws from a stand-in. The stand-in
+must behave like the real server closely enough that what works against it works against the backend:
+the same requests, errors, delays and cancellations. It must also serve realistic data at realistic scale
+— ten thousand transactions, assets with 6 to 24 decimals — so the product is seen under load. And it must
+never reach users: stand-in code in the shipped app is dead weight at best and a fake answer at worst. A
+stand-in inside the browser is the quickest and most familiar, but it lives in the app's own code. A
+stand-in running as its own server is one more moving part, but then the app that is tested is exactly
+the app that ships. It is decided now because the first page and the first tests need data.
+
+**Not decided here:**
+- pagination, sorting and filtering (D-06, plan 07) — the stand-in serves whatever the contract says;
+- the test runner and where browser tests run (D-09);
+- performance budgets on this dataset (D-20);
+- the session endpoint and the reaction to an expired session (D-17).
+
+| Criterion | A — in the browser: a service worker intercepts requests (MSW 2.15.0), our handlers; MSW in Node for tests | B — generated from the contract: orval's `mock: true`, MSW handlers with random data | C — a mock server that reads the contract (Prism 5.16.0) | D — our own mock service: one Web-standard handler over a seeded dataset, served by Bun in its own container behind `/api`; tests plug the same handler into `fetch` |
+|---|---|---|---|---|
+| QR-11 no mock in the shipped build | ⚠️ the worker file lives in `public/`, which the build copies whole (measured); handlers kept out only by a build flag | ⚠️ as A | ✅ a separate process | ✅ `mock/` is outside `src/`; lint will refuse an import that leaves `src/` — today it ignores one (measured), so plan 04 closes that with a fixture case |
+| D-12 the production form and browser tests get data from the unchanged build | ❌ the production build has no worker: a special build for tests, or an error page | ❌ as A | ✅ Caddy proxies `/api` | ✅ Caddy proxies `/api`; the dev server proxies it too (Vite `server.proxy`) |
+| QR-6 a seeded dataset: ≥ 10 000 rows, ≥ 20 assets, 8 and 18 decimals | ✅ with D's generator | ❌ an asset is 10–20 random letters, its decimals drawn 0–36 per amount; 1–10 rows; no paging (generated, read) | ❌ examples or random values per field; no dataset to page through | ✅ 10 000 rows, 22 assets, decimals 6–24, 1 742 amounts past `Number.MAX_SAFE_INTEGER`; same seed, same hash; 5.0 ms (spike) |
+| FR-3, QR-5 typed from the contract | ✅ handlers typed with the generated types | ✅ generated | ✅ reads the contract | ✅ typed with the generated types; the whole dataset passes the generated schema (4.4 ms) — a test in `check` turns drift into a failure |
+| Behaves like the network: status, errors, cancellation reach the real transport | ✅ | ✅ | ✅ real HTTP | ✅ real HTTP in both forms; in tests the handler receives a `Request` with the caller's signal: aborted at 20 ms → `AbortError`; `failStatus: 503` → `ApiError http 503` through the transport (spike) |
+| QR-6 latency and errors switchable | ✅ per-test overrides (`server.use`) — its strongest point | ⚠️ by editing generated handlers | ⚠️ `Prefer` headers pick an example or a status | ✅ handler options (`latencyMs`, `failStatus`), from the environment in the container; ⚠️ no matching language — an odd response in one test means wrapping the handler |
+| QR-8, QR-24 what it adds | ⚠️ `msw`: 18 dependencies, 52 packages in all, 6.0 MB, a `postinstall` script | ❌ `msw` and `@faker-js/faker` 10.6.0 (2.9 MB) | ❌ 168 packages; no provenance; a usage-telemetry dependency (`@scarf/scarf`) | ✅ nothing: Bun is already the runtime; about 80 lines (spike) |
+| C-2 one command, and what compose gains | ✅ nothing | ✅ nothing | ⚠️ a service and its image | ⚠️ a `mock` service from the image we already build, and a proxy line in Vite and in Caddy |
+| DR-2 same origin, as a cookie session will need | ⚠️ same origin, but nothing ever sets a cookie | ⚠️ as A | ✅ `/api` behind the proxy | ✅ `/api` behind the proxy; the CSP's `connect-src 'self'` stays as it is |
+| Cost of changing later | ✅ remove the worker | ⚠️ as A | ✅ repoint the proxy | ✅ repoint the proxy to the backend; the handler stays as the test double |
+| QR-21 the company's stack | ❓ the posting names neither | ❓ | ❓ | ❓ |
+
+- **Decision:** the stand-in is its own service, never part of the app. `mock/` sits beside `src/` and
+  `contract/`:
+  - *Handler* — `mock/handler.ts` is one Web-standard function, `(Request) => Promise<Response>`. It
+    answers the contract's endpoints from a seeded dataset (`mock/dataset.ts`, a fixed seed), typed with
+    the generated types, with errors as the contract's `Problem`.
+  - *Server* — `mock/server.ts` is `Bun.serve({ fetch: handler })`, the compose service `mock`, built from
+    the image we already have. Seed, size, latency and injected failures come from the environment, with
+    defaults, so `docker compose up` needs no setup.
+  - *One origin* — the transport's base URL is `/api` everywhere. The dev server proxies it to `mock`, and
+    so does Caddy in the production form, so every browser test runs the unchanged production build.
+  - *Tests* — the same handler, plugged into `fetch`, serves integration tests. They run the real adapter,
+    transport and query client over the same data, with no server and no mocking library.
+  - *Guards* — lint refuses an import from `src/` that resolves outside it, with a fixture case; a test in
+    `check` checks the whole dataset against the generated schema, and that the same seed gives the same
+    data.
+- **Evidence:** spikes, 2026-09-11, Bun 1.4.2, TypeScript 7.0.2 under our strict flags, the D-03 spike's
+  contract, adapter and transport.
+  - *Dataset* — 10 000 rows, 4 091 trades, 22 assets, decimals 6, 7, 8, 9, 10, 18 and 24; the longest amount
+    has 29 digits; generated in 5.0 ms (median of 11); seed 42 hashed the same twice and differently from
+    seed 43; 1 198 KiB as JSON; the generated schema accepted all of it in 4.4 ms.
+  - *Handler* — the first page was 6.2 KiB; a cursor walk read 200 pages and 10 000 rows. Through
+    `fetch`: the adapter returned 50 rows whose units are `bigint`; `failStatus: 503` reached the caller as
+    `ApiError { kind: 'http', status: 503 }` with the `Problem` body; `latencyMs: 200` answered after
+    202 ms; an abort at 20 ms rejected with `AbortError` after 25 ms.
+  - *Served* — `Bun.serve` returned bytes identical to the direct call (7 991 bytes); an unknown path gave
+    404 with `application/problem+json`. Listening was refused inside the agent's sandbox, so this ran
+    outside it.
+  - *Generated mocks* — orval 8.28.1 with `mock: true` wrote handlers that draw `asset` as 10–20 random
+    letters, `decimals` as 0–36 per amount and `baseUnits` from the pattern, with 1–10 rows per page.
+  - *Build* — `public/favicon.svg` appears in the build output, so a worker in `public/` would ship.
+  - *Lint* — the D-16 rule stops at imports that resolve outside `src/`: it locates the target, finds no
+    layer, and reports nothing.
+  - *Registry* — `msw` 2.15.0 (2026-07-08, one maintainer, provenance, 18 dependencies, 52 packages
+    counted at their latest versions, 6.0 MB, `postinstall`); `@faker-js/faker` 10.6.0 (2026-08-14,
+    2.9 MB); `@stoplight/prism-cli` 5.16.0 (2026-07-17, no provenance, 168 packages); Vite 8.3.0 declares
+    `server.proxy`.
+- **Wrong if:**
+  - tests need many one-off responses per resource — then MSW in Node for tests only, wrapping this
+    handler; the service stays;
+  - the backend team offers a sandbox API or its own mock — then the proxy points there, and the handler
+    stays only as the test double;
+  - a screen needs server-side filtering the handler cannot answer simply (D-06) — then the dataset moves
+    into Bun's built-in SQLite, behind the same handler.
+- **Where it leads:**
+  - *Gains* — the build users get is the build every browser test runs; the stand-in cannot leak into
+    it, by structure and by lint; one dataset serves development, the production form, browser, performance
+    and integration tests; realistic scale from the first page; the same-origin setup a cookie session
+    needs; nothing to install.
+  - *Costs* — a third service in compose (the agent's sandbox cannot write `compose.yaml`, so that change
+    goes through the author); a proxy in Vite and in Caddy; request matching is ours, a `switch` that grows
+    with the endpoints; no per-test override language; the `mock` container runs project code with network
+    access, the gap D-26 names, unchanged in kind.
+  - *Growth path* — a handler file per resource as endpoints grow; the real backend repoints the proxy;
+    MSW if per-test overrides multiply, wrapping the same handler; a second service (DR-5) is a second
+    proxy route and a second handler.
+  - *A backend of our own* — weighed at the author's question and left out. The task asks for a mocked
+    API, §10 puts a real backend out of scope, and the company's backend is Ruby, so a TypeScript one would
+    be thrown away. The service grows toward one only where the frontend has something to show: `/me`
+    and a session cookie if D-17 demonstrates the expired-session flow, and `bun:sqlite` when writes
+    arrive.
 
 ## Course corrections
 
