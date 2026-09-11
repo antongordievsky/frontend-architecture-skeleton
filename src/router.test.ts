@@ -1,6 +1,6 @@
 import { QueryClient } from '@tanstack/react-query'
 import { createMemoryHistory } from '@tanstack/react-router'
-import { describe, expect, test } from 'vitest'
+import { describe, expect, test, vi } from 'vitest'
 import { createAppRouter, endSession } from './router.ts'
 
 // The real router and route tree, in Node over memory history. Nothing is rendered (D-09).
@@ -16,6 +16,14 @@ describe('endSession, the answer to a 401 (D-17, D-18)', () => {
     queryClient.setQueryData(['/transactions'], { items: ['a page of transactions'] })
     await endSession(await openAt('/transactions/tx-1', queryClient), queryClient)
     expect(queryClient.getQueryCache().getAll()).toHaveLength(0)
+  })
+
+  test("clears the router's cache too, which holds what loaders returned", async () => {
+    const queryClient = new QueryClient()
+    const router = await openAt('/transactions/tx-1', queryClient)
+    const clearCache = vi.spyOn(router, 'clearCache')
+    await endSession(router, queryClient)
+    expect(clearCache).toHaveBeenCalledOnce()
   })
 
   test('sends the user to sign in, with the address to come back to', async () => {
@@ -50,10 +58,16 @@ describe("the sign-in page's return address (QR-11)", () => {
     expect(returnTo('/transactions/tx-1')).toEqual({ redirect: '/transactions/tx-1' })
   })
 
-  test.each(['//evil.example', '/\\evil.example', 'https://evil.example', 'javascript:alert(1)'])(
-    'falls back to the dashboard for %s',
-    (redirect) => {
-      expect(returnTo(redirect)).toEqual({ redirect: '/' })
-    },
-  )
+  // A browser deletes tabs and line breaks from a URL, so the last three would read as `//evil.example`.
+  test.each([
+    '//evil.example',
+    '/\\evil.example',
+    'https://evil.example',
+    'javascript:alert(1)',
+    '/\t/evil.example',
+    '/\n/evil.example',
+    '/\r\\evil.example',
+  ])('falls back to the dashboard for %s', (redirect) => {
+    expect(returnTo(redirect)).toEqual({ redirect: '/' })
+  })
 })

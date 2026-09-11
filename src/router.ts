@@ -24,6 +24,8 @@ export type AppRouter = ReturnType<typeof createAppRouter>
 // to; replacing the entry keeps Back from returning to a page that would fail again.
 export const endSession = (router: AppRouter, queryClient: QueryClient): Promise<void> => {
   queryClient.clear()
+  // The router keeps what recent and preloaded loaders returned; that goes too.
+  router.clearCache()
   const { pathname, href } = router.state.location
   if (pathname === '/sign-in') return Promise.resolve()
   return router.navigate({ to: '/sign-in', search: { redirect: href }, replace: true })
