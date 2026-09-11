@@ -314,7 +314,7 @@ Options are genuinely different approaches, and the company's own stack is alway
 | D-21 | What keeps secrets and unsafe code out, and what may the agent touch? | QR-11, DR-6, QR-7, QR-23, QR-24 | plan 02 |
 | D-23 | How do new packages get into the project, and how do we keep them up to date? | QR-24, QR-25, QR-11 | plan 02 |
 | D-26 | When the agent starts a container, how much of the machine can that container reach? | DR-6, QR-11, QR-7, QR-8, C-2, FR-6 | deferred by the author — not what the take-home is about |
-| D-16 | How do we divide the code so everyone knows where things go, and the parts of the product stay apart? | FR-1, FR-2, DR-1, DR-4, DR-8, QR-8, QR-17, QR-21, QR-23 | plan 03 |
+| D-16 | How do we divide the code so everyone knows where things go, and the parts of the product stay apart? (amended: the shell's routes live in files, D-05) | FR-1, FR-2, DR-1, DR-4, DR-8, QR-8, QR-17, QR-21, QR-23 | plan 03 |
 | D-03 | When the server sends data, how do we make sure it is right before a screen shows it? (the generator itself moved to D-24, CC-01) | FR-3, QR-1, QR-2, QR-5, QR-9, DR-2, DR-5, DR-8, QR-8, QR-24, QR-21 | plan 04 |
 | D-08 | How do we hold money so that no amount is ever silently wrong? (amended: the minor digits travel with the amount, CC-06) | QR-1, QR-2, QR-3, QR-8, QR-9, QR-21, QR-24 | plan 04 |
 | D-27 | How many digits does a screen show for each currency — every digit of the unit (`HUF 1,234.56`), or the local convention (`1235 Ft`)? A domain question, split from D-08 (CC-06) | QR-2, QR-21 | deferred by the author — needs domain research; until then every digit is shown and nothing is rounded (QR-2) |
@@ -945,6 +945,9 @@ code, and the rules must exist before the code does.
     domain/                   money and transactions; no React, no DOM (D-01)
   ```
 
+  - *Amended 2026-09-11 by D-05, agreed with plan 05:* the shell is `main.tsx`, `router.ts`, the route
+    files in `routes/` and the generated `routeTree.gen.ts`. There is no `AppRouter.tsx`. A route file
+    reaches a zone only through its `index.ts`, as any shell file does.
   - *Modules.* A module is a page, a `ui` primitive or a shared composite. Other code imports it only
     through its `index.ts`. Inside a module anything goes, with relative imports.
   - *Pages.*
