@@ -318,7 +318,7 @@ Options are genuinely different approaches, and the company's own stack is alway
 | D-03 | When the server sends data, how do we make sure it is right before a screen shows it? (the generator itself moved to D-24, CC-01) | FR-3, QR-1, QR-2, QR-5, QR-9, DR-2, DR-5, DR-8, QR-8, QR-24, QR-21 | plan 04 |
 | D-08 | How do we hold money so that no amount is ever silently wrong? | QR-1, QR-2, QR-3, QR-8, QR-9, QR-21, QR-24 | plan 04 |
 | D-04 | Where does the demo data come from, and how do we keep it out of what users download? | FR-3, QR-6, QR-11, C-2, QR-5, QR-8, QR-9, QR-24, QR-21 | plan 04 |
-| D-17 | Authentication architecture (design for) | DR-2, QR-11 | plan 04 |
+| D-17 | How do people sign in, and what does the browser keep so that nobody can steal a session? (design for) | DR-2, QR-11, DR-3, DR-8 | plan 04 |
 | D-09 | Testing strategy and environments (unit, component/integration, e2e, browsers in Docker); proving tests fail — manual deliberate breaks vs mutation testing (input: Stryker 10.0.0 with a Vitest runner, measured 2026-09-10) | FR-6, QR-12, QR-22, QR-23 | plan 04 (first tests) |
 | D-05 | Routing | FR-4, QR-3, QR-21 | plan 05 |
 | D-18 | Authorization model (design for, guard seam) | DR-3, QR-17 | plan 05 |
@@ -1349,6 +1349,84 @@ the app that ships. It is decided now because the first page and the first tests
     be thrown away. The service grows toward one only where the frontend has something to show: `/me`
     and a session cookie if D-17 demonstrates the expired-session flow, and `bun:sqlite` when writes
     arrive.
+
+### D-17 — How do people sign in, and what does the browser keep so that nobody can steal a session?
+
+`Accepted` 2026-09-11 · needed by plan 04 · design for (the transport's part is built now) · judged by DR-2,
+QR-11, DR-3, DR-8
+
+**What we are deciding.** Users sign in with email or a social account. After that, something in the
+browser proves who they are on every request. Whatever that proof is, a malicious script that gets into
+the page can try to take it, and with it a taxpayer's whole financial history. The proof can be a token
+the app holds, which works from any domain but can be stolen, or a cookie scripts cannot read, which
+cannot be stolen but needs the app and the API on one site. Plan 04 builds the request layer, so the
+choice fixes now what it sends and how it reacts to a lost session. Sign-in screens come later.
+
+**Not decided here:** routing and the sign-in page's route (D-05); permissions and route guards (D-18);
+the sign-in providers and the backend's auth stack (the backend's choice); the mobile app's flow (DR-8).
+
+| Criterion | A — the backend signs in and keeps the tokens; the browser holds an httpOnly session cookie (the pattern RFC 10017 calls backend-for-frontend; Rails plays that role, no separate service) | B — the app signs in itself (OAuth with PKCE), tokens in memory | C — tokens in browser storage |
+|---|---|---|---|
+| DR-2, QR-11 no token in the browser | ✅ none exists | ❌ in JavaScript memory | ❌ and it survives the tab |
+| A malicious script in the page | ⚠️ can act as the user while the page is open; has nothing to take away | ❌ can read the token and use it elsewhere | ❌ as B, after the tab is closed as well |
+| Frontend code | ✅ no auth library; sign-in is a navigation to the backend | ⚠️ an OIDC client, a callback page, a refresh loop | ❌ as B, and D-21's lint refuses the storage |
+| the company's Rails backend | ✅ Rails is the confidential client; its CSRF check expects `X-CSRF-Token` | ⚠️ Rails validates tokens instead of sessions | ⚠️ as B |
+| App and API on different sites | ⚠️ needs one site: the `/api` proxy (D-04), or a shared parent domain | ✅ | ✅ |
+| DR-8 React Native | ⚠️ its own flow, in the platform's part of the transport (D-01) | ✅ one flow for both | ✅ |
+
+- **Decision:** the browser never holds a token. The backend runs sign-in as the confidential client and
+  keeps the tokens; the browser holds an httpOnly session cookie, sent to the same site only.
+  - *Built now, in plan 04:*
+    - the transport sends `credentials: 'same-origin'` — the default, written out, because `include`
+      would send the cookie to any origin a misconfigured base URL pointed to;
+    - a 401 is `ApiError { kind: 'http', status: 401 }` and is never retried (D-03's cache policy);
+    - nothing else: no session query, guard or sign-in page before a screen needs them (QR-8).
+  - *Designed for, with the first sign-in screen:*
+    - sign-in is a full-page navigation to the backend's `/auth/<provider>`, from a page in the public
+      zone (D-16). No OAuth code runs in the browser;
+    - the session is a typed query, `/me`, which also carries the user's permissions (D-18);
+    - on a 401, the shell sends the user to sign-in with the current URL to return to. `api` cannot
+      import the router, so the query client raises one signal and the shell reacts;
+    - signing out, and every 401, clears the query cache, so no financial data outlives the session
+      in memory;
+    - *CSRF* — the backend sets the session cookie `SameSite=Lax`, which keeps it off cross-site `fetch`
+      and `POST`; that is defence in depth only. Every request other than GET, HEAD and OPTIONS carries
+      `X-CSRF-Token`, Rails' header, and the transport adds it. The token arrives in the `/me` response,
+      agreed with the backend, and the transport holds it in memory. A meta tag or a readable cookie
+      would need `document`, which lint refuses in `api` (DR-8), and a meta tag exists only if Rails
+      renders the page. The stand-in answers a mutation without the token with 403, as Rails does, so the
+      first mutation cannot work until the header is in place.
+- **Evidence:** read 2026-09-11.
+  - RFC 10017, *OAuth 2.0 for Browser-Based Applications* (BCP 212, August 2026) recommends the
+    backend-for-frontend pattern as the most secure: "there are no tokens available to extract from the
+    browser".
+  - The Rails security guide: requests from scripts pass the CSRF check through the `X-CSRF-Token`
+    header, whose value `csrf_meta_tags` renders into `<meta name="csrf-token">`.
+  - MDN, `RequestInit.credentials`: `omit`, `same-origin` or `include`, "Defaults to `same-origin`".
+  - OWASP's CSRF cheat sheet: `SameSite` "should be treated as a defense-in-depth layer and combined
+    with a CSRF token"; for script requests a custom header is preferred; GET, HEAD and OPTIONS "need not
+    be appended with a CSRF token header".
+  - MDN, `Set-Cookie`: a `Lax` cookie goes cross-site only with a top-level navigation by a safe method,
+    never with `fetch()` or `POST`.
+  - `.oxlintrc.json`: `document` is a restricted global in `src/api` (CC-04).
+  - The D-03 spike's transport used `include`. This entry corrects that before the transport is written.
+- **Wrong if:**
+  - the app and the API must live on different sites (a CDN domain and `api.` on another registrable
+    domain) — then `include`, CORS with credentials and `SameSite=None`, and the CSRF header becomes
+    essential;
+  - the identity provider's terms require an in-browser flow — then B, tokens in memory only, never in
+    storage;
+  - the backend issues only bearer tokens for every client — then a thin session layer in front of it
+    is the backend's work, not the frontend's.
+- **Where it leads:**
+  - *Gains* — nothing in the browser to steal; the frontend carries no auth library; a new sign-in
+    provider is a backend change and a button.
+  - *Costs* — the app and the API must share a site, which D-04's proxy already gives locally; the CSRF
+    header must be in place before the first mutation; the local stand-in shows no real session until it
+    grows `/me` and a cookie (D-04).
+  - *Growth path* — the first sign-in screen brings `/me`, the 401 reaction and sign-out, with the
+    stand-in setting a cookie; React Native gets its own credentials part of the transport, with tokens
+    in the platform's secure storage (DR-8).
 
 ## Course corrections
 
