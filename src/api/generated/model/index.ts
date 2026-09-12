@@ -14,4 +14,5 @@ export * from './trade.zod';
 export * from './transaction.zod';
 export * from './transactionKind.zod';
 export * from './transactionPage.zod';
+export * from './transactionSort.zod';
 export * from './withdrawal.zod';

@@ -9,11 +9,12 @@ import * as zod from 'zod/mini';
 export const listTransactionsParamsLimitDefault = 50;
 export const listTransactionsParamsLimitMax = 200;
 
-
+export const listTransactionsParamsSortDefault = `occurredAt:desc`;
 export const ListTransactionsParams = /*#__PURE__*/ zod.object({
   "cursor": /*#__PURE__*/ zod.optional(/*#__PURE__*/ zod.string()),
   "limit": /*#__PURE__*/ zod._default(/*#__PURE__*/ zod.int().check(/*#__PURE__*/ zod.gte(1)).check(/*#__PURE__*/ zod.lte(listTransactionsParamsLimitMax)), listTransactionsParamsLimitDefault),
-  "kind": /*#__PURE__*/ zod.optional(/*#__PURE__*/ zod.enum(['deposit', 'withdrawal', 'trade']))
+  "kind": /*#__PURE__*/ zod.optional(/*#__PURE__*/ zod.enum(['deposit', 'withdrawal', 'trade'])),
+  "sort": /*#__PURE__*/ zod._default(/*#__PURE__*/ zod.enum(['occurredAt:desc', 'occurredAt:asc', 'value:desc', 'value:asc']), listTransactionsParamsSortDefault).check(/*#__PURE__*/ zod.describe('A field and a direction. `occurredAt:desc` is the default, which is what "newest first" means. Sorting by value orders by the fiat value the server recorded, never by a crypto amount: two amounts in different assets are not comparable (QR-1, D-08).'))
 })
 
 export type ListTransactionsParams = zod.input<typeof ListTransactionsParams>;
