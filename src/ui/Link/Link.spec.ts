@@ -25,3 +25,13 @@ test('looks as approved: at rest, focused, current', async ({ mount, page }) => 
   await expect(link).toHaveScreenshot('default-focused.png')
   await expect(await mount('ui/Link/Current')).toHaveScreenshot('current.png')
 })
+
+// The nav variant is a row, not a sentence: no underline, and the current page is marked by its ground rather
+// than by weight alone.
+test('the nav variant looks as approved: at rest, focused, current', async ({ mount, page }) => {
+  const link = await mount('ui/Link/Nav')
+  await expect(link).toHaveScreenshot('nav.png')
+  await page.keyboard.press('Tab')
+  await expect(link).toHaveScreenshot('nav-focused.png')
+  await expect(await mount('ui/Link/NavCurrent')).toHaveScreenshot('nav-current.png')
+})

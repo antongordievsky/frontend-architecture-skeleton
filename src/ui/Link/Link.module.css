@@ -24,3 +24,42 @@
   font-weight: var(--weight-bold);
   text-decoration: none;
 }
+
+/* The `nav` variant: a row in a side navigation, not a link inside a sentence. No underline, because a column of
+   underlined rows reads as a list of interruptions. */
+.nav {
+  display: block;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--text-muted);
+  text-decoration: none;
+  cursor: pointer;
+  outline: none;
+  transition:
+    background-color var(--duration-fast),
+    color var(--duration-fast);
+}
+
+.nav[data-hovered] {
+  color: var(--text);
+  background: var(--surface-raised);
+}
+
+.nav[data-focus-visible] {
+  outline: var(--focus-width) solid var(--focus);
+  outline-offset: var(--focus-offset);
+}
+
+/* The current page, in the same word the screen reader hears. */
+.nav[aria-current="page"] {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nav {
+    transition: none;
+  }
+}

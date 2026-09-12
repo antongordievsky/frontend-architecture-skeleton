@@ -9,3 +9,15 @@ export const Current = () => (
     Transactions
   </Link>
 )
+
+export const Nav = () => (
+  <Link href="/transactions" variant="nav">
+    Transactions
+  </Link>
+)
+
+export const NavCurrent = () => (
+  <Link href="/transactions" variant="nav" aria-current="page">
+    Transactions
+  </Link>
+)
