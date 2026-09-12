@@ -255,6 +255,16 @@ What they asked for — each became a requirement:
   policy; fiat valuation at transaction time; tax-year boundaries across timezones; duplicate, missing and
   partially imported transactions; immutable history; reconciliation across thousands of rows.
 
+## 10a. Known gaps in the code — found, recorded, not yet fixed
+
+- **A page holds another page's screen.** `src/app/pages/Transactions/Details/` contains
+  `TransactionDetailsPage`, the screen of the `transactions.$transactionId` route, and the zone's
+  `index.ts` re-exports it from there. The rule agreed with the author on 2026-09-12 is that a page is a
+  leaf: it holds `units/` and `hooks/`, never another page. D-16's lint rule does not catch this today — it
+  forbids imports *between* pages, not nesting. Fix: promote it to its own page module
+  (`src/app/pages/TransactionDetails/`), and consider a lint case that refuses a capitalised folder inside a
+  page module, so the rule becomes a gate rather than a convention.
+
 ## 10. Out of scope — by decision
 
 Neither built nor designed for, each for a stated reason (finalised in Part II and `ARCHITECTURE.md`

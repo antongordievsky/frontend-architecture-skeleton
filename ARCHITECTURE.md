@@ -1,115 +1,153 @@
 # Architecture
 
-A frontend skeleton for a crypto-tax product. This is the one-page summary. The long version — every
-decision with the options it beat, its evidence, and the condition that would make it wrong — is
-[`docs/requirements-and-analysis.md`](docs/requirements-and-analysis.md); where a section names an ID, that
-entry is the authority. [`docs/plans/`](docs/plans/) records how each slice actually went.
+A frontend skeleton for a crypto-tax product: the structure, the boundaries that hold it, the
+seams it grows through, and what was deliberately left out.
 
-## The shape
+## 1. Architecture at a glance
 
-One Vite application, one contract, one design system, three actor zones inside `src/`:
+```
+src/
+├── routes/       route shell
+├── public/       visitor zone
+├── app/          taxpayer zone
+├── admin/        support zone
+├── components/   shared product components
+├── ui/           product-agnostic design system
+├── api/          network boundary
+└── domain/       framework-free domain types
 
-`routes/` the shell — a path, a search schema, the page from its zone · `public/`, `app/`, `admin/` the
-zones, isolated from each other · `components/` composites that know the product, not a screen · `ui/` the
-design system, no product knowledge · `api/` the one exit to the network · `domain/` money and transactions
-as plain data, free of React and the DOM · `mock/` the stand-in backend, unreachable from `src/`.
+mock/             stand-in backend, served over HTTP; unreachable from src/
+```
 
-Imports run one way, and that is **enforced, not documented**: `lint/layers.js` resolves every import and
-fails on an upward or sideways one (D-16). A new top-level folder fails lint until its row is added, and
-the rule has its own test over 33 expected violations, so a rule that stopped matching would fail `check`
-rather than pass quietly.
+Dependencies flow one way:
 
-Where does X go? A page → `src/<zone>/pages/<Name>/`. A composite → `components/`. A primitive →
-`ui/<Name>/`. A server resource → an adapter in `api/`. A domain type → `domain/`.
+```
+routes → zones → components → ui
+                     ↓
+                    api → domain
+```
 
-## The seams
+- zones cannot import each other
+- pages cannot import other pages
+- a page, a part and a shared component are all modules: a folder with one `index.ts`, private
+  inside
+- `ui/` knows nothing about the product
+- `api/` is the only network boundary
+- `domain/` has no React and no DOM dependencies
 
-**The contract owns every server type** (D-03, D-24). `contract/openapi.yaml` is the source; orval writes
-types, Zod schemas and calls into `api/generated`, private to `api/` by lint and never hand-edited. A drift
-gate fails `check` when the two disagree, so a contract change breaks compilation at the call sites instead
-of at runtime.
+## 2. Boundaries are enforced
 
-**One exit to the network** (D-03, D-17). `api/transport.ts` owns the base URL (`/api`, same-origin, so the
-session cookie never leaves the site), the credentials policy and one error shape. Each adapter validates
-the response against the contract's schema and returns domain types, so the cache holds what screens use.
+Architecture is enforced by lint, not by convention (D-16). What is physically refused:
 
-**Money is never a float** (D-08). Crypto amounts are integer base units carrying the asset's decimals;
-fiat amounts are integer minor units carrying their own exponent, because currency tables disagree about it
-(CC-06). Parsed once at the boundary, formatted only at render. Mixing two assets fails to compile — shown
-by a type-level test.
+- a zone importing another zone
+- a page importing another page, or being reached by a deep path instead of its zone's entry point
+- anything but `ui/` importing React Aria
+- raw `button`, `input`, `a`, `select`, `textarea` or `dialog` outside `ui/`
+- `api/generated` reached from outside `api/`
+- a raw colour, or a custom property defined outside `ui/tokens.css`
+- a token storage call, or `dangerouslySetInnerHTML`, anywhere
 
-**State has three homes** (D-06). Server data in TanStack Query, keyed by the question. The question — the
-filter and the order — in the address, validated by the route's search schema, so a shared link shows the
-same rows. Client state local. The rule that keeps it honest: nothing is computed from the pages already
-loaded, because the first hundred rows sorted by value are not the hundred largest. Sorting and filtering
-are the server's work.
+The layer rule is itself tested against 33 known violations, so a rule that stopped matching fails
+`check` instead of passing quietly.
 
-**The design system is the only place with a look** (D-07, D-28). Parts wrap React Aria — only `ui/` may
-import it — and style themselves through its `data-*` states, with a pointer and a keyboard focus ring by
-default. Every colour and size is a token in `ui/tokens.css`, and `scripts/check-tokens.mjs` refuses a raw
-colour anywhere else. Raw `button`, `input`, `a` and friends are lint errors outside `ui/`. One theme.
+## 3. The seams
 
-**Auth is a seam, not a feature** (D-17, D-18). The browser never holds a token — storing one is a lint
-error. The session is a typed query, the transport is the one place a 401 is answered, and screens are
-gated on permissions rather than role names, so a new role needs no frontend release.
+### API
 
-## What stops erosion
+`contract/openapi.yaml` is the source of truth.
 
-`check` runs format → lint (plus the boundary rule's own test) → tokens → contract drift → route drift →
-typecheck → tests → build → secret scan → audit, on the host or in Docker. Hooks run it per commit, and
-again in Docker before a push with the browser suite and the production-headers test.
+```
+OpenAPI → orval → generated client → adapter → domain types → screen
+```
 
-Two rules carry the rest. **A commit passes every gate existing at that commit** — no exceptions, which is
-why a contract change and its regeneration are now one commit. And **nothing is trusted until it has been
-seen failing** (QR-23): every test and gate is proven by a deliberate break, recorded in the plan's log.
-That has caught three tests asserting less than they appeared to — an `aria-current` count that never named
-which row should be current, an id tiebreaker whose removal changed nothing observable, and a header check
-that a removed proxy left green because the SPA fallback also answers 200.
+Responses are validated at the boundary against the contract's schema, and screens never use
+generated types. A drift between the contract and the committed client fails `check`. Money
+crosses this seam as integers — base units with the asset's decimals, minor units with their own
+exponent — so no amount is ever held in a float (D-03, D-08).
 
-Controls no tool enforces, named rather than assumed: a container the agent starts still reaches the tree
-and the network (D-26, deferred), and `SideNav`'s `activeOptions` insurance has no test proving it.
+### State
 
-## Testing and performance
+- server state → TanStack Query, keyed by the question asked
+- filter and sort state → the URL, validated by the route's search schema
+- ephemeral UI state → local React state
 
-Logic is `*.test.ts` beside the code, in Node, with no simulated page; anything that renders is
-Playwright's (D-09, D-14). A part's states are stories, screenshot-compared with zero tolerance in three
-engines; pages and flows run in two. The stand-in is plugged into `fetch` for integration tests and served
-over HTTP for the browser. Today: 77 tests in Node, 87 in the browser.
+Filtering and sorting stay server-side: the first hundred rows sorted by value are not the hundred
+largest (D-06).
 
-Ten thousand rows reach the DOM a screenful at a time through React Aria's virtualiser — measured, 17 rows
-rendered of 10 000, with the scroll content covering the whole set. Pages of 100 rows are 21 kB on the
-wire. Each route is its own chunk, which required declaring `sideEffects` to actually happen (CC-07). The
-build is 392.58 kB, 124.39 kB gzipped, of which the transactions route is 215.34 kB / 62.20 kB.
+### Routing
 
-## Security
+TanStack Router owns typed paths and search parameters, and generates the route tree from the
+route files. A route connects a URL to a page exported by a zone, and does nothing else (D-05).
 
-Closed by tools wherever one exists (D-21, D-23). No secret in the repository — a scanner in the hook and
-in `check`; `.env*` ignored and unreadable by the agent; `VITE_*` treated as public. A CSP on the
-production form, asserted by a test that also covers the cache rules, written after a review found a
-missing asset cached as HTML for a year. Frozen installs, an audit in `check`, and a seven-day quarantine
-on new versions whose own gaps were closed once found (CC-02, CC-08).
+### Design system
 
-## Skipped, and what comes next
+`ui/` wraps React Aria and owns interaction behaviour: keyboard, screen reader, touch, the
+pointer, and a visible focus ring. Screens consume parts rather than styling interactive
+primitives. Every colour and size comes from tokens, so a redesign touches the tokens and the
+parts, never the screens (D-07, D-28).
 
-| Not built | Why | What it needs |
-|---|---|---|
-| Three-audience flows: session, sign-up, the support zone (D-30) | the timebox went to the table and the look | a session in the stand-in, one `can()`, one guard, three journeys |
-| Page-level axe and a keyboard pass over the transactions page | cut for that page's budget | `@axe-core/playwright`, a second Playwright group against `web-prod` |
-| Throttled performance test and bundle budget (QR-9) | partial, by the author's decision | budgets in `check`, one throttled run of the 10 000-row screen |
-| CI/CD (DR-9) | no PR flow here; the local `check` is the gate | the same commands per push, plus agent reviewers as gates |
-| A real backend, tax calculation, imports, charts, i18n, hosting | out of scope by decision | each is a service away; the contract is the seam |
+## 4. Representative slice
 
-Said plainly: the transactions page has no spec of its own in the repository. Its parts do, and its
-behaviour was driven in a browser and recorded in
-[`docs/plans/08-transactions-page.md`](docs/plans/08-transactions-page.md) — so a regression on the page
-itself would not fail `check` today. That is the first thing to close.
+The transactions page exercises every seam end to end:
 
-## Where the reasoning changed
+```
+URL → route search schema → page → TanStack Query → API adapter
+    → generated client → stand-in backend over HTTP
+```
 
-Ten assumptions were overturned by evidence, and the chain is kept rather than tidied away (Part II §
-Course corrections): an unmaintained generator (CC-01), a quarantine a warm cache walked through (CC-02), a
-server layer assumed free of React (CC-04), a currency's minor digits assumed universal (CC-06), code
-splitting assumed automatic (CC-07), styles a package injected that reading its code did not reveal
-(CC-09), a router link and a kit link assumed to cooperate (CC-10). The latest came from this page's own
-subject: `system-ui` resolved to a CJK font inside the test image, so every screenshot baseline had been
-photographing a font no user would ever see.
+The response is validated and converted into domain types before it enters the cache. Ten thousand
+rows are served in pages of 100 and rendered through virtualisation, with 17 rows mounted at a
+time. The sort order lives in the address, so a shared link shows the same rows in the same order.
+
+## 5. Quality gates
+
+`check` runs:
+
+```
+format → lint → architecture rules → tokens → contract drift
+      → route drift → typecheck → tests → build → secrets → audit
+```
+
+It runs on a developer machine or in Docker, on every commit through a hook, and again before a
+push. Browser tests cover interaction and visual states in Chromium, WebKit and Firefox, with
+screenshot baselines compared at zero tolerance.
+
+Every new test and gate is deliberately broken once before it is adopted, to prove it detects the
+failure it claims to (QR-23).
+
+Current numbers: 77 Node tests · 87 browser tests · 10 000 transaction rows · 17 rows mounted at
+once.
+
+## 6. Deliberate cuts
+
+This is a foundation, not a production frontend. Not built:
+
+- real authentication and sign-up flows
+- the support journey
+- a real backend, and any tax logic
+- CI/CD
+- i18n
+- hosting
+- a full accessibility pass
+- a performance budget
+
+**Known gap.** The transactions page has no page-level regression test. Its parts are covered, but
+a regression in how the page composes them could currently pass `check`. That is the first gap to
+close.
+
+## 7. Why these choices
+
+Three principles drove the design:
+
+1. **Enforce the boundaries that matter.** If an architectural rule is worth having, `check`
+   should be able to fail on it. A boundary nobody can cross beats one everybody agrees with.
+2. **Generate at external seams.** The server contract generates the client; hand-written adapters
+   keep the rest of the frontend independent of generated code.
+3. **Build only what has a consumer.** Authentication, the remaining zones and the infrastructure
+   have seams and paragraphs, not speculative implementations.
+
+The full decision record — every option, why each rejected one lost, the evidence, and the
+condition that would make a decision wrong — is in
+[`docs/requirements-and-analysis.md`](docs/requirements-and-analysis.md). How each slice was
+built, and what broke along the way, is in
+[`docs/plans/`](docs/plans/00-requirements-and-working-agreement.md).

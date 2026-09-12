@@ -7,7 +7,8 @@ answers is quoted at the end.
 - **Architecture, one page:** [`ARCHITECTURE.md`](ARCHITECTURE.md)
 - **The long version** — every decision with its options, evidence and "wrong if":
   [`docs/requirements-and-analysis.md`](docs/requirements-and-analysis.md)
-- **How the work went**, plan by plan, including what broke: [`docs/plans/`](docs/plans/)
+- **How the work went**, plan by plan, including what broke:
+  [`docs/plans/`](docs/plans/00-requirements-and-working-agreement.md)
 
 ## Run it
 
