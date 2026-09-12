@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { type ReactNode, useState } from 'react'
 import type { SortDescriptor } from 'react-aria-components'
 import { Table, type TableColumn } from './Table.tsx'
 
@@ -34,15 +34,27 @@ const rowsOf = (count: number): readonly Row[] =>
     value: `€${((i % 97) * 13 + 4).toFixed(2)}`,
   }))
 
-export const Default = () => <Table label="Transactions" columns={COLUMNS} rows={rowsOf(6)} />
+// The gallery mounts a story in a narrow box; a table needs room, or every column clips and the baseline
+// shows ellipses instead of the look being approved.
+const Frame = ({ children }: { readonly children: ReactNode }) => (
+  <div style={{ width: 720 }}>{children}</div>
+)
+
+export const Default = () => (
+  <Frame>
+    <Table label="Transactions" columns={COLUMNS} rows={rowsOf(6)} />
+  </Frame>
+)
 
 export const Empty = () => (
-  <Table
-    label="Transactions"
-    columns={COLUMNS}
-    rows={[]}
-    renderEmptyState={() => 'No transactions yet.'}
-  />
+  <Frame>
+    <Table
+      label="Transactions"
+      columns={COLUMNS}
+      rows={[]}
+      renderEmptyState={() => 'No transactions yet.'}
+    />
+  </Frame>
 )
 
 // The sorted state, held by the story as a page would hold it in the address (D-06).
@@ -52,15 +64,21 @@ export const Sorted = () => {
     direction: 'descending',
   })
   return (
-    <Table
-      label="Transactions"
-      columns={COLUMNS}
-      rows={rowsOf(6)}
-      sortDescriptor={sortDescriptor}
-      onSortChange={setSortDescriptor}
-    />
+    <Frame>
+      <Table
+        label="Transactions"
+        columns={COLUMNS}
+        rows={rowsOf(6)}
+        sortDescriptor={sortDescriptor}
+        onSortChange={setSortDescriptor}
+      />
+    </Frame>
   )
 }
 
 // QR-6: the case the part exists for. Only a screenful reaches the DOM; the spec counts the rows to prove it.
-export const ManyRows = () => <Table label="Transactions" columns={COLUMNS} rows={rowsOf(10_000)} />
+export const ManyRows = () => (
+  <Frame>
+    <Table label="Transactions" columns={COLUMNS} rows={rowsOf(10_000)} />
+  </Frame>
+)

@@ -51,9 +51,10 @@ export type TableProps<Row extends { readonly id: string }> = {
 }
 
 // The layout's own numbers, in px, because a virtualiser has to know a row's height before it renders one.
-// They match the stylesheet's padding and line height; a change in one is a change in both.
+// They match the stylesheet's padding and line height; a change in one is a change in both. HEADING_HEIGHT
+// is the header's measured height (38px): a larger number left a gap between it and the first row.
 const ROW_HEIGHT = 44
-const HEADING_HEIGHT = 40
+const HEADING_HEIGHT = 38
 
 export function Table<Row extends { readonly id: string }>({
   label,
@@ -91,9 +92,25 @@ export function Table<Row extends { readonly id: string }>({
       >
         {(row: Row) => (
           <AriaRow id={row.id} columns={columns} className={styles.row}>
-            {(column: TableColumn<Row>) => (
-              <AriaCell className={styles.cell}>{column.cell(row)}</AriaCell>
-            )}
+            {(column: TableColumn<Row>) => {
+              const value = column.cell(row)
+              /*
+               * The tooltip goes on a span inside the cell, not on the cell. React Aria filters the props it
+               * puts on a cell against an allowlist, and `title` is in none of its four sets — measured: a
+               * `data-*` prop reached the DOM from the same place and `title` did not. So a clipped value is
+               * still readable on hover, through the browser's own tooltip: no component, no script.
+               */
+              return (
+                <AriaCell className={styles.cell}>
+                  <span
+                    className={styles.value}
+                    {...(typeof value === 'string' ? { title: value } : {})}
+                  >
+                    {value}
+                  </span>
+                </AriaCell>
+              )
+            }}
           </AriaRow>
         )}
       </AriaTableBody>

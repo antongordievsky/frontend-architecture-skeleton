@@ -10,13 +10,23 @@
   width: 100%;
   border-collapse: collapse;
   background: var(--surface);
+  /*
+   * No bottom border: every cell draws one, so the last visible row already closes the table. Having both
+   * drew two lines a pixel apart at the end of the list (measured).
+   */
   border: 1px solid var(--border);
+  border-bottom: 0;
   border-radius: var(--radius-md);
   overflow: auto;
   /* A table of ten thousand rows scrolls inside itself; the page must not grow to hold them. */
   max-height: 70vh;
 }
 
+/*
+ * The virtualiser gives geometry to a wrapper, not to the element with role="rowgroup" — measured, that one
+ * computes to 0px, so a background on it paints nothing. Every visible surface therefore belongs to the
+ * cells and the column headers.
+ */
 .header {
   background: var(--surface-raised);
 }
@@ -30,6 +40,14 @@
   border-bottom: 1px solid var(--border);
   outline: none;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+
+  /* Opaque and above the rows: the rows scroll under the header, never through it. */
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--surface-raised);
 }
 
 /* A sortable heading says so to the pointer; the rest of the header is not a control (QR-12). */
@@ -60,8 +78,12 @@
   outline-offset: calc(var(--focus-offset) * -1);
 }
 
+/*
+ * No border here. A virtualised row computes to 1px, so its own border-bottom drew a second line hard
+ * under the header (measured: header ends at 121, the row sat at 123 with a border of its own). The line
+ * between rows belongs to the cells, which have the real height.
+ */
 .row {
-  border-bottom: 1px solid var(--border);
   outline: none;
 }
 
@@ -74,12 +96,27 @@
   outline-offset: calc(var(--focus-offset) * -1);
 }
 
+/*
+ * The virtualiser gives each column a fixed width, so a value longer than its column has to be cut here.
+ * Measured: an 18-decimal trade needed 364px in a 199px column and was painted straight over the next one.
+ * Clipping with an ellipsis keeps the row readable; the full amount belongs to the row's own screen, never
+ * to a rounded number in the list (QR-2).
+ */
 .cell {
   padding: var(--space-2) var(--space-3);
   font-size: var(--text-sm);
   color: var(--text);
+  border-bottom: 1px solid var(--border);
   outline: none;
+  overflow: hidden;
+}
+
+/* The clipped text itself, so the ellipsis has an element of its own to end on. */
+.value {
+  display: block;
+  overflow: hidden;
   white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .cell[data-focus-visible] {

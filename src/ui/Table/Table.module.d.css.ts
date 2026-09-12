@@ -7,5 +7,6 @@ declare const styles: {
   readonly body: string
   readonly row: string
   readonly cell: string
+  readonly value: string
 }
 export default styles
