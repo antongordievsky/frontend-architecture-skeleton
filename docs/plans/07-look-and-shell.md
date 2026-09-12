@@ -99,3 +99,80 @@ Icons; a web font (D-29's growth path); the dashboard's and settings' content; a
 3. `ui/TextField`, which then moves into plan 09 beside its consumer.
 
 Steps 3 to 5 cannot be cut: they are the plan.
+
+## What happened
+
+**Status:** done. Nothing was cut. Five commits: the documents, the palette with its baselines, the field, the
+navigation, the shell.
+
+### The measurement that changed the work
+
+Step 2 was meant to be a formality. `fc-match` inside `mcr.microsoft.com/playwright:v1.62.1-noble` answered:
+
+```
+system-ui        -> wqy-zenhei.ttc: "WenQuanYi Zen Hei"
+sans-serif       -> wqy-zenhei.ttc: "WenQuanYi Zen Hei"
+Arial            -> LiberationSans-Regular.ttf: "Liberation Sans"
+```
+
+Every baseline this repository had was therefore a photograph of a CJK face that no user's browser would ever
+pick. `--font-sans` now names Arial first, which resolves to Liberation Sans in the image — metrically compatible
+— and to Arial or Helvetica on a designer's machine. This is why D-29 says the stack is measured, not chosen.
+
+### D-28's promise, checked
+
+The whole palette moved and `git diff --cached --name-only` listed no file under any zone's `pages/`. That is the
+evidence behind "a redesign changes the tokens file and the parts' stylesheets, never the screens" — until now it
+was only a claim.
+
+### Two findings from things that refused to work
+
+1. **The React Compiler cannot lower a default beside a rest element.** `function Link({ variant = 'inline',
+   ...props })` fails with *"Expected object property value to be an LVal, got: AssignmentPattern"*, and D-13's
+   `panicThreshold: 'all_errors'` makes that a build error. Because `RouterLink` draws every link, the dev server
+   answered 500 for story modules that had nothing to do with the change, and the failure looked like a broken
+   gallery rather than a broken component. The rule now lives in `CLAUDE.md`.
+2. **`activeOptions` on a nav link does nothing here.** Neither `exact: false` nor `includeSearch: true` changes
+   which row is current: the router decides by the route it matched, and a link with no search params is a subset
+   of any address's params. `SideNavItem.exact` was dead and is gone.
+
+### The break that broke nothing
+
+Finding 2 came out of a deliberate break that *passed*. The test counted current rows without saying which row
+should be current, so inverting the option left it green. A test that cannot fail is the thing QR-23 exists to
+catch, and it was caught by the ritual rather than by luck. The test now names the dashboard as the row that must
+not light up, the story's address carries `?sort=value:desc` because a filter is not another screen (D-06), and
+the proof is a different break: start the story on `/` and the test fails.
+
+### Deviations
+
+| Deviation | Why |
+|---|---|
+| Steps 3 and 4 are one commit, not two | a commit with the new palette and the old baselines would pass `check`, which does not run the browser suite, and fail in the browser. It would be green and wrong |
+| `ui/Link` gained a variant, which the plan did not name | the sidebar row is a link, and D-28 puts a link's look in the kit. The alternative was `components/SideNav` writing colours, which the token gate refuses and D-16 would not forgive |
+| `/security-review` not run | the criterion now in `CLAUDE.md`: this diff is tokens, stylesheets, two presentational parts and a layout — no session, permissions, cookies, headers, proxy or dependency. Plan 09 is where it runs |
+| Playwright MCP not connected | a script stood in, as in plan 06, and drove the built app in chromium |
+
+### Gaps left open, named
+
+- **The shell has no automated guard.** `SideNav`'s spec covers the navigation and today's drive covered the rest
+  by hand. Plan 09's browser flows are where `AppLayout` gets a test that runs on its own.
+- **Inside the browser image, `require('playwright')` resolves to 1.63.0-alpha** (`@playwright/mcp` brings its own
+  copy) while the image ships 1.62.1 browsers. A script must ask `@playwright/test` for chromium. Plans 08 and 09
+  will meet this again.
+
+### Numbers
+
+- baselines: 36 → 18 after the palette (one theme), then 18 → 37 as `TextField` (15), the nav variant (9) and
+  `SideNav` (3) arrived;
+- the browser suite: 66 tests in three engines, about 20 s;
+- eight deliberate breaks in total; six failed as predicted, one failed for a reason that exposed a blind test,
+  one passed and cost the `exact` option its place.
+
+### Commands worth keeping
+
+```
+docker compose run --rm --entrypoint sh browser -c 'fc-match sans-serif; fc-match Arial'
+docker compose run --rm browser --project=chromium -g "<test name>"
+docker compose run --rm --entrypoint sh browser -c 'vite & node - <<JS … @playwright/test … JS'
+```

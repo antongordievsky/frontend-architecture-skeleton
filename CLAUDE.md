@@ -190,6 +190,9 @@ Requirements (Part I) are written once and change only with the author's agreeme
 
 - Everything in the repository is English. Conversation with the author may be in any language.
 - Comments explain why, never what. No dependency without a written reason (QR-8).
+- No default value beside a rest element in a component's parameters — `({ variant = 'x', ...props })`. The
+  React Compiler (D-13) cannot lower it, and `panicThreshold: 'all_errors'` turns that into a build error that
+  surfaces as unrelated modules failing to load. Read the absent value in the expression instead (plan 07).
 - Docs are written for a cold reader: why, current state, decision + rejected alternative, pointers,
   next actions.
 
