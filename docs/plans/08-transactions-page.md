@@ -1,6 +1,6 @@
 # Plan 08 — The transactions page: ten thousand rows, answered by the server
 
-**Status:** draft — awaiting GREEN LIGHT · **Timebox:** 90 min of execution
+**Status:** GREEN LIGHT (2026-09-12) · **Timebox:** 90 min of execution
 **Serves:** FR-3, FR-4, FR-7, QR-6, QR-12, QR-17, QR-22, QR-23, QR-24, C-2 · **Applies:** D-06, D-04,
 D-03, D-05, D-07, D-09, D-12, D-14 (amended), D-16, D-28, D-29
 
