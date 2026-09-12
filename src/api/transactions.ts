@@ -6,7 +6,9 @@ import {
   type CryptoAmountOutput,
   type FiatAmountOutput,
   type ListTransactionsParams,
+  TransactionKind,
   TransactionPage,
+  TransactionSort,
 } from './generated/model/index.ts'
 import { ApiError } from './transport.ts'
 
@@ -72,6 +74,34 @@ export const transactionsQuery = (params?: ListTransactionsParams) =>
  * call. Every page goes through the same `toPage`, so the cache holds domain rows with exact integers.
  */
 const PAGE_SIZE = 100
+
+/**
+ * D-05, D-06: the address is the question, so the address is what gets validated. A shared or hand-edited
+ * link falls back to the default rather than breaking the screen: the contract's own enums decide what is
+ * allowed, and anything else is simply not there. This lives in api/ because the generated schemas are
+ * private to it (D-16) — a route file may not read them.
+ */
+export type TransactionsSearch = {
+  readonly sort: NonNullable<ListTransactionsParams['sort']>
+  readonly kind?: NonNullable<ListTransactionsParams['kind']>
+}
+
+/**
+ * The address a link to the transactions screen carries when it has nothing else to say. The route's search
+ * schema makes `sort` required, so every link names it — and this is the one place the default lives, rather
+ * than a copy at each link (found by the compiler when the schema arrived, exactly as plan 07's review
+ * predicted it would).
+ */
+export const TRANSACTIONS_DEFAULT_SEARCH: TransactionsSearch = { sort: 'occurredAt:desc' }
+
+export const parseTransactionsSearch = (search: Record<string, unknown>): TransactionsSearch => {
+  const sort = TransactionSort.safeParse(search['sort'])
+  const kind = TransactionKind.safeParse(search['kind'])
+  return {
+    sort: sort.success ? sort.data : 'occurredAt:desc',
+    ...(kind.success ? { kind: kind.data } : {}),
+  }
+}
 
 export const transactionsInfiniteQuery = (params?: ListTransactionsParams) =>
   infiniteQueryOptions({

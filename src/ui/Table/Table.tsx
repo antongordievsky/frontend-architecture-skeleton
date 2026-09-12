@@ -33,6 +33,12 @@ export type TableColumn<Row> = {
   readonly cell: (row: Row) => ReactNode
 }
 
+/**
+ * D-16: the kit owns the vocabulary of its own library. A page says "sorted by this column, this way"
+ * without importing React Aria — only ui/ may do that, and lint enforces it.
+ */
+export type TableSortDescriptor = SortDescriptor
+
 export type TableProps<Row extends { readonly id: string }> = {
   readonly label: string
   readonly columns: readonly TableColumn<Row>[]

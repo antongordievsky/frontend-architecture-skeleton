@@ -1,4 +1,5 @@
 import { getRouteApi } from '@tanstack/react-router'
+import { TRANSACTIONS_DEFAULT_SEARCH } from '@/api/transactions.ts'
 import { RouterLink } from '@/components/RouterLink'
 
 // D-05: the route's parameters, typed through the registered router. A page may not import its route
@@ -13,7 +14,12 @@ export function TransactionDetailsPage() {
       <p>A placeholder. A transaction's details arrive with the data they show.</p>
       {/* Exact: the router counts a link as current on its child addresses too, and a screen reader
           would announce this one as the current page. */}
-      <RouterLink to="/transactions" activeOptions={{ exact: true }}>
+      {/* The list's address carries its question (D-06), so a link back names the default one. */}
+      <RouterLink
+        to="/transactions"
+        search={TRANSACTIONS_DEFAULT_SEARCH}
+        activeOptions={{ exact: true }}
+      >
         Back to transactions
       </RouterLink>
     </>
