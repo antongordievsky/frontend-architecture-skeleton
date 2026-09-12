@@ -27,6 +27,12 @@
 		-Server
 	}
 
+	# D-04, D-12: the stand-in backend, on this origin. The app ships no base URL and asks for /api; in
+	# production this block points at the real backend instead. MOCK_URL names the container to reach.
+	handle /api/* {
+		reverse_proxy {$MOCK_URL:mock:3001}
+	}
+
 	handle /assets/* {
 		file_server
 	}

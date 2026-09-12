@@ -24,6 +24,7 @@ Everything runs in Docker (C-2). Host commands use the runtimes pinned in `mise.
 | Regenerate the API client after a contract change | `mise exec -- bun run generate` |
 | Regenerate the route tree after adding, renaming or removing a route file (the dev server does it too) | `mise exec -- bun run routes` |
 | Production headers and cache rules (with `web-prod` running) | `sh scripts/check-headers.sh` |
+| The stand-in backend alone, on the host | `MOCK_PORT=3001 mise exec -- bun run mock/server.ts` |
 | Refresh the code index | `mise exec -- bun run graph:update` (`graph:build` rebuilds from scratch) |
 
 - `WEB_PORT` and `PROD_PORT` override 5173 and 8080 when they are taken.

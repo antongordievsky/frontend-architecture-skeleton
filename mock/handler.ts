@@ -62,8 +62,19 @@ export const createHandler = (options: MockOptions = {}) => {
   }
 }
 
-// A test puts the handler where the network was: relative URLs resolve against a fixed origin.
+/**
+ * A test puts the handler where the network was: relative URLs resolve against a fixed origin.
+ *
+ * Not `typeof fetch`: this takes a URL and returns a response, and that is all the tests ask of it.
+ * The wider promise was never true — there is no `preconnect` here, and a `Request` argument would be
+ * stringified rather than honoured. @types/bun (added 2026-09-12 for mock/server.ts) made the gap a
+ * compile error, which is the type doing its job.
+ */
+export type FetchLike = (url: string, init?: RequestInit) => Promise<Response>
+
 export const asFetch =
-  (handler: (request: Request) => Promise<Response>): typeof fetch =>
-  (input, init) =>
-    handler(new Request(new URL(String(input), 'http://localhost'), init))
+  (handler: (request: Request) => Promise<Response>): FetchLike =>
+  (url, init) =>
+    // `new URL(...).href`, not the URL itself: Request takes a string or a Request, and Bun's types
+    // (unlike the DOM's) say so.
+    handler(new Request(new URL(url, 'http://localhost').href, init))

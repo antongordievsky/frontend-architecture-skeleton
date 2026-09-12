@@ -5,7 +5,10 @@
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.mock.tsbuildinfo",
     "target": "es2023",
     "lib": ["ES2023"],
-    "types": ["node"],
+    // D-04: `bun` brings Bun.serve, which mock/server.ts is the only caller of. @types/bun 1.4.1 was chosen
+    // over 1.4.2 on 2026-09-12 because bun-types' 368 declaration files are byte-identical between the two
+    // (measured: only package.json differs), so the aged version needs no quarantine exception (CC-08).
+    "types": ["node", "bun"],
     "skipLibCheck": true,
 
     /* Bundler mode */

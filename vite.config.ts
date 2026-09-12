@@ -21,6 +21,13 @@ export default defineConfig({
     // component, which belongs in the domain anyway (QR-2).
     babel({ presets: [reactCompilerPreset({ panicThreshold: 'all_errors' })] }),
   ],
+  // D-04, D-12: one origin everywhere. The browser asks this server for /api, and it passes the question to
+  // the stand-in backend (mock/server.ts) — so the app has no base URL to configure, and no CORS to weaken
+  // (D-17: the session cookie is same-origin). Caddy does the same in the production form.
+  // MOCK_URL names the stand-in: another container in Docker, localhost on a developer's machine.
+  server: {
+    proxy: { '/api': { target: process.env['MOCK_URL'] ?? 'http://localhost:3001' } },
+  },
   // D-14: the dev server pre-bundles what the app, the story gallery and every story import. By default it
   // crawls index.html alone, and the gallery reaches stories through import.meta.glob, so a package first
   // used by a story was found mid-test and the page reloaded under it (measured in plan 06).
