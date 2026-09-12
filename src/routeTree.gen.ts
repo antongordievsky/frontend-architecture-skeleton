@@ -14,7 +14,6 @@ import { Route as SignInRouteImport } from './routes/sign-in'
 import { Route as AppIndexRouteImport } from './routes/_app/index'
 import { Route as AppSettingsRouteImport } from './routes/_app/settings'
 import { Route as AppTransactionsIndexRouteImport } from './routes/_app/transactions.index'
-import { Route as AppTransactionsTransactionIdRouteImport } from './routes/_app/transactions.$transactionId'
 
 const AppRoute = AppRouteImport.update({
   id: '/_app',
@@ -40,25 +39,17 @@ const AppTransactionsIndexRoute = AppTransactionsIndexRouteImport.update({
   path: '/transactions/',
   getParentRoute: () => AppRoute,
 } as any)
-const AppTransactionsTransactionIdRoute =
-  AppTransactionsTransactionIdRouteImport.update({
-    id: '/transactions/$transactionId',
-    path: '/transactions/$transactionId',
-    getParentRoute: () => AppRoute,
-  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
   '/sign-in': typeof SignInRoute
   '/settings': typeof AppSettingsRoute
-  '/transactions/$transactionId': typeof AppTransactionsTransactionIdRoute
   '/transactions/': typeof AppTransactionsIndexRoute
 }
 export interface FileRoutesByTo {
   '/sign-in': typeof SignInRoute
   '/settings': typeof AppSettingsRoute
   '/': typeof AppIndexRoute
-  '/transactions/$transactionId': typeof AppTransactionsTransactionIdRoute
   '/transactions': typeof AppTransactionsIndexRoute
 }
 export interface FileRoutesById {
@@ -67,31 +58,19 @@ export interface FileRoutesById {
   '/sign-in': typeof SignInRoute
   '/_app/settings': typeof AppSettingsRoute
   '/_app/': typeof AppIndexRoute
-  '/_app/transactions/$transactionId': typeof AppTransactionsTransactionIdRoute
   '/_app/transactions/': typeof AppTransactionsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths:
-    | '/'
-    | '/sign-in'
-    | '/settings'
-    | '/transactions/$transactionId'
-    | '/transactions/'
+  fullPaths: '/' | '/sign-in' | '/settings' | '/transactions/'
   fileRoutesByTo: FileRoutesByTo
-  to:
-    | '/sign-in'
-    | '/settings'
-    | '/'
-    | '/transactions/$transactionId'
-    | '/transactions'
+  to: '/sign-in' | '/settings' | '/' | '/transactions'
   id:
     | '__root__'
     | '/_app'
     | '/sign-in'
     | '/_app/settings'
     | '/_app/'
-    | '/_app/transactions/$transactionId'
     | '/_app/transactions/'
   fileRoutesById: FileRoutesById
 }
@@ -137,27 +116,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppTransactionsIndexRouteImport
       parentRoute: typeof AppRoute
     }
-    '/_app/transactions/$transactionId': {
-      id: '/_app/transactions/$transactionId'
-      path: '/transactions/$transactionId'
-      fullPath: '/transactions/$transactionId'
-      preLoaderRoute: typeof AppTransactionsTransactionIdRouteImport
-      parentRoute: typeof AppRoute
-    }
   }
 }
 
 interface AppRouteChildren {
   AppSettingsRoute: typeof AppSettingsRoute
   AppIndexRoute: typeof AppIndexRoute
-  AppTransactionsTransactionIdRoute: typeof AppTransactionsTransactionIdRoute
   AppTransactionsIndexRoute: typeof AppTransactionsIndexRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
   AppSettingsRoute: AppSettingsRoute,
   AppIndexRoute: AppIndexRoute,
-  AppTransactionsTransactionIdRoute: AppTransactionsTransactionIdRoute,
   AppTransactionsIndexRoute: AppTransactionsIndexRoute,
 }
 
