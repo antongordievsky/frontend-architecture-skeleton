@@ -1,6 +1,4 @@
-/* The shell's frame around every zone. Colours and type come from the design tokens (D-28). */
+/* Each zone brings its own frame — the taxpayer's is app/AppLayout. What belongs to the document is here. */
 #root {
-  max-width: var(--frame-width);
-  margin: 0 auto;
-  padding: var(--space-8);
+  min-height: 100vh;
 }

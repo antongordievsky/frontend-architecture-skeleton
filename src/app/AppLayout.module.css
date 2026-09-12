@@ -1,14 +1,29 @@
-/* The taxpayer's zone: the navigation above every page. Every value is a token (D-28). */
-.header {
-  margin-bottom: var(--space-6);
-  padding-bottom: var(--space-4);
-  border-bottom: 1px solid var(--border);
+/* The taxpayer's zone: a sidebar beside the page. Every value is a token (D-28, D-29). */
+.shell {
+  display: grid;
+  grid-template-columns: var(--sidebar-width) 1fr;
+  min-height: 100vh;
 }
 
-.links {
+.sidebar {
   display: flex;
+  flex-direction: column;
   gap: var(--space-6);
+  padding: var(--page-pad-y) var(--space-4);
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+}
+
+.brand {
   margin: 0;
-  padding: 0;
-  list-style: none;
+  padding: 0 var(--space-3);
+  font-size: var(--text-lg);
+  font-weight: var(--weight-bold);
+  color: var(--text);
+}
+
+/* min-width: 0 so a wide table scrolls inside the page instead of stretching the grid column (plan 08). */
+.main {
+  min-width: 0;
+  padding: var(--page-pad-y) var(--page-pad-x);
 }
