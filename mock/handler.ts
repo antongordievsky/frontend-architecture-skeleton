@@ -1,6 +1,11 @@
 // D-04: the stand-in for the backend, as one Web-standard function. Plan 07 serves it with Bun behind /api;
 // until then tests plug it straight into `fetch`. It answers the contract's endpoints and nothing else.
-import { ListTransactionsParams, type TransactionPage } from '../src/api/generated/model/index.ts'
+import {
+  ListTransactionsParams,
+  type ListTransactionsParamsOutput,
+  type Transaction,
+  type TransactionPage,
+} from '../src/api/generated/model/index.ts'
 import { generateTransactions } from './dataset.ts'
 
 export type MockOptions = {
@@ -33,6 +38,47 @@ const sleep = (ms: number, signal: AbortSignal) =>
     )
   })
 
+/**
+ * D-06: the order the whole set is read in. `value` is the fiat value the server recorded; a crypto amount
+ * is never compared across assets (QR-1, D-08).
+ *
+ * Compared as BigInt, not Number: a value in minor units can exceed what a double holds exactly, and this
+ * is the stand-in for a server that would compare them in the database.
+ *
+ * Every comparison ends with the id, and a deliberate break (QR-23) measured exactly what that is worth:
+ * removing the tiebreaker left every test green. The dataset does hold ties — 9 pairs of equal `value.minor`
+ * in 10 000 rows, measured — but `Array.prototype.sort` is stable, so equal rows keep their input order and
+ * every request returns the same sequence anyway. The tiebreaker therefore guards nothing observable *here*;
+ * it guards the move to a real server, where rows of equal value come back in whatever order the database
+ * chose and a cursor walking them would repeat one row and skip another. `sortedFor` is exported so that a
+ * test can feed the same rows in two orders and see the tiebreaker do that job.
+ */
+export const sortedFor = (
+  rows: readonly Transaction[],
+  sort: ListTransactionsParamsOutput['sort'],
+): readonly Transaction[] => {
+  const byId = (a: Transaction, b: Transaction) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)
+  const compare = (a: Transaction, b: Transaction): number => {
+    switch (sort) {
+      case 'occurredAt:asc':
+        return a.occurredAt < b.occurredAt ? -1 : a.occurredAt > b.occurredAt ? 1 : byId(a, b)
+      case 'occurredAt:desc':
+        return a.occurredAt > b.occurredAt ? -1 : a.occurredAt < b.occurredAt ? 1 : byId(a, b)
+      case 'value:asc': {
+        const left = BigInt(a.value.minor)
+        const right = BigInt(b.value.minor)
+        return left < right ? -1 : left > right ? 1 : byId(a, b)
+      }
+      case 'value:desc': {
+        const left = BigInt(a.value.minor)
+        const right = BigInt(b.value.minor)
+        return left > right ? -1 : left < right ? 1 : byId(a, b)
+      }
+    }
+  }
+  return [...rows].sort(compare)
+}
+
 export const createHandler = (options: MockOptions = {}) => {
   const dataset = generateTransactions(options.seed ?? 42, options.count ?? 10_000)
   return async (request: Request): Promise<Response> => {
@@ -48,12 +94,17 @@ export const createHandler = (options: MockOptions = {}) => {
       cursor: url.searchParams.get('cursor') ?? undefined,
       limit: url.searchParams.has('limit') ? Number(url.searchParams.get('limit')) : undefined,
       kind: url.searchParams.get('kind') ?? undefined,
+      // Absent means the contract's default, occurredAt:desc; anything the enum does not name is a 400,
+      // which the schema decides rather than this code.
+      sort: url.searchParams.get('sort') ?? undefined,
     })
     if (!query.success) return problem(400, 'Invalid query')
-    const { cursor = '0', limit, kind } = query.data
+    const { cursor = '0', limit, kind, sort } = query.data
     // Opaque to the client; here it is an offset into the dataset.
     if (!/^\d+$/.test(cursor)) return problem(400, 'Invalid cursor')
-    const rows = kind ? dataset.filter((t) => t.kind === kind) : dataset
+    // D-06: filter, then order, then cut the page — over the whole set. Ordering inside the page would
+    // make the first hundred rows by value look like the hundred largest, which they are not.
+    const rows = sortedFor(kind ? dataset.filter((t) => t.kind === kind) : dataset, sort)
     const start = Number(cursor)
     const items = rows.slice(start, start + limit)
     const page: TransactionPage =
