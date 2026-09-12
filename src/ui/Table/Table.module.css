@@ -1,0 +1,92 @@
+/*
+ * D-28: styled through React Aria's state attributes; every value is a token. Only the states measured in
+ * react-aria 1.21 are used here — data-hovered, data-focused, data-focus-visible, data-allows-sorting,
+ * data-sort-direction — so the stylesheet promises nothing the library does not give.
+ *
+ * The virtualiser positions rows absolutely and scrolls the table itself, so the heights here and the
+ * layout's ROW_HEIGHT / HEADING_HEIGHT in Table.tsx are one decision in two places.
+ */
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: auto;
+  /* A table of ten thousand rows scrolls inside itself; the page must not grow to hold them. */
+  max-height: 70vh;
+}
+
+.header {
+  background: var(--surface-raised);
+}
+
+.column {
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--text-muted);
+  text-align: start;
+  border-bottom: 1px solid var(--border);
+  outline: none;
+  white-space: nowrap;
+}
+
+/* A sortable heading says so to the pointer; the rest of the header is not a control (QR-12). */
+.column[data-allows-sorting] {
+  cursor: pointer;
+  color: var(--text);
+}
+
+.column[data-allows-sorting][data-hovered] {
+  background: var(--accent-soft);
+}
+
+.column[data-sort-direction] {
+  color: var(--accent);
+}
+
+/* The direction, drawn rather than written: the arrow follows aria-sort, which React Aria owns. */
+.column[data-sort-direction="ascending"]::after {
+  content: " ↑";
+}
+
+.column[data-sort-direction="descending"]::after {
+  content: " ↓";
+}
+
+.column[data-focus-visible] {
+  outline: var(--focus-width) solid var(--focus);
+  outline-offset: calc(var(--focus-offset) * -1);
+}
+
+.row {
+  border-bottom: 1px solid var(--border);
+  outline: none;
+}
+
+.row[data-hovered] {
+  background: var(--surface-page);
+}
+
+.row[data-focus-visible] {
+  outline: var(--focus-width) solid var(--focus);
+  outline-offset: calc(var(--focus-offset) * -1);
+}
+
+.cell {
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--text);
+  outline: none;
+  white-space: nowrap;
+}
+
+.cell[data-focus-visible] {
+  outline: var(--focus-width) solid var(--focus);
+  outline-offset: calc(var(--focus-offset) * -1);
+}
+
+.body {
+  color: var(--text);
+}
