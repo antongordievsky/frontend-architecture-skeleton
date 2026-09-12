@@ -176,3 +176,22 @@ docker compose run --rm --entrypoint sh browser -c 'fc-match sans-serif; fc-matc
 docker compose run --rm browser --project=chromium -g "<test name>"
 docker compose run --rm --entrypoint sh browser -c 'vite & node - <<JS … @playwright/test … JS'
 ```
+
+### What `/code-review` found, and what changed
+
+Seven findings. `/security-review` was skipped by the criterion; the reviewer ran the host gates independently
+and found no type, lint, boundary or token defect.
+
+| Finding | What was done |
+|---|---|
+| **The input's border was invisible** — `--border-strong` on `--surface` measured 1.57:1, under the 3:1 WCAG 2.2 AA 1.4.11 asks of a component's boundary | fixed: a new raw `--cool-400`, now 3.47:1. Button's and TextField's baselines were re-shot |
+| **Disabled text regressed** from 5.10:1 to 2.52:1 in the palette port | fixed: `--on-disabled` is `--slate-600`, 6.17:1. WCAG exempts disabled controls; a reader does not |
+| **My comment about `activeOptions` was wrong.** The reviewer read `link.js`: a non-exact match is a pathname prefix test, and `includeSearch` defaults to **true** with partial comparison. It is inert today only because the link builds an empty search — plan 08's `validateSearch` would change that, and the row would lose `aria-current` on the first sort | `includeSearch: false` restored, and the comment rewritten. **But:** with a search schema added to the story's route, removing the option still does not flip the row, because a link without an explicit `search` inherits the current address's params. So it is kept as insurance and recorded as **unproven** — the test that would prove it needs the real route, in plan 08 |
+| **The story could not prove what it claimed** — no `validateSearch`, so the comparison never ran | the story's transactions route now carries a schema with a default, which is closer to the real shape even though it did not produce the failure |
+| **D-29 promised contrast measured through axe, and it was not measured** | measured by hand and written into D-29's Evidence; axe itself arrives with plan 08. This is the lapse that let the two contrast faults ship |
+| **`--radius-lg`, `--shadow-1`, `--shadow-2` had no consumer** — against the plan's own words | removed. They come back when a part needs them |
+| **The sidebar is a fixed 15rem with no breakpoint**; at 320px the page gets about 64px | left as it is, and named here: no requirement in Part I covers small viewports, and inventing one mid-plan is scope. It belongs in `ARCHITECTURE.md` § Next |
+
+The lesson worth keeping: two of the seven came from *my own measurement being shallower than the source*. I
+measured behaviour in a story and concluded an option was decoration; the reviewer read the library and found the
+condition under which it is not. Measuring beats recalling, and reading the source beats both.

@@ -15,6 +15,8 @@ test('exactly one row is the current page, and it moves when followed', async ({
   await expect(current).toHaveText('Transactions')
   // Named on purpose: '/' is a prefix of every address, so the dashboard is the row that would wrongly light up
   // if the current page were ever decided by the address as text rather than by the route the router matched.
+  // The story's address also carries a sort, so this says the row survives a filter — but only for this shape
+  // of route. What happens when the real transactions route validates its search is plan 08's to prove.
   await expect(story.getByRole('link', { name: 'Dashboard' })).not.toHaveAttribute(
     'aria-current',
     'page',

@@ -16,6 +16,7 @@
   --cool-100: #eff2f7;
   --cool-200: #e4e8f0;
   --cool-300: #c8cfd9;
+  --cool-400: #7a8ba3;
   --line-200: #dde1ea;
   --slate-400: #8494a7;
   --slate-600: #475569;
@@ -35,9 +36,6 @@
   --space-8: 2rem;
   --radius-sm: 4px;
   --radius-md: 6px;
-  --radius-lg: 10px;
-  --shadow-1: 0 1px 2px rgb(15 23 42 / 6%);
-  --shadow-2: 0 1px 2px rgb(15 23 42 / 5%), 0 8px 20px -12px rgb(15 23 42 / 25%);
 
   /*
    * Raw: type. Measured 2026-09-12 inside Microsoft's Playwright image, where the baselines are taken:
@@ -69,7 +67,9 @@
   --text: var(--slate-900);
   --text-muted: var(--slate-600);
   --border: var(--line-200);
-  --border-strong: var(--cool-300);
+  /* The edge of a control a user must find before focusing it. Measured against --surface: 3.47:1, over the
+     3:1 that WCAG 2.2 AA 1.4.11 asks of a component's boundary. --cool-300 gave 1.57:1 and was invisible. */
+  --border-strong: var(--cool-400);
   --accent: var(--indigo-600);
   --accent-hover: var(--indigo-700);
   --accent-soft: var(--indigo-50);
@@ -78,7 +78,10 @@
   --negative: var(--red-700);
   --focus: var(--indigo-600);
   --disabled: var(--cool-200);
-  --on-disabled: var(--slate-400);
+  /* A disabled control still has to be readable: it says what it would do, it just cannot be used. The grey
+     ground, the cursor and the disabled state carry that meaning. Measured on --disabled: 6.17:1; --slate-400
+     gave 2.52:1, which WCAG exempts and a reader does not. */
+  --on-disabled: var(--slate-600);
 
   /* Meaning: the shell's own measurements (D-29). */
   --sidebar-width: 15rem;

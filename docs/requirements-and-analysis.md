@@ -2381,8 +2381,13 @@ It is decided now because plan 07 writes the shell every later screen sits in, a
     amendment.
   - `scripts/check-tokens.mjs` already refuses a colour written anywhere but the tokens file, and any `var(--…)`
     the file does not define, so the port cannot be half-done: a value left behind fails `check`.
-  - *Not measured:* which family `system-ui` resolves to inside the Playwright image; the contrast ratios of the
-    new pairs. Plan 07 measures both, the second through axe.
+  - *Measured in plan 07, after the port:* `system-ui` resolves inside the Playwright image to WenQuanYi Zen
+    Hei, so the stack names Arial first (see the plan's log). Contrast, computed from the token values rather
+    than by axe, which arrives with plan 08: body text 16.4:1, muted text 7.0:1, accent on surface 5.6:1, the
+    focus ring 6.3:1, error text 6.5:1 — all above AA. Two pairs failed and were changed in the same plan: a
+    control's boundary (`--border-strong`) measured 1.57:1 against 1.4.11's 3:1 and is now 3.47:1, and disabled
+    text measured 2.52:1 — which WCAG exempts and a reader does not — and is now 6.17:1.
+  - *Not measured:* the palette under axe's own rules, and at small viewport widths.
 - **Wrong if:**
   - a real brand arrives from the company. Then its values replace these, in the same file — which is the point;
   - axe finds a contrast pair below AA that cannot be tuned without losing the look. Then the accent moves, not

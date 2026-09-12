@@ -24,12 +24,15 @@ export function SideNav({ label, items }: SideNavProps) {
       <ul className={styles.list}>
         {items.map((item) => (
           <li key={item.to}>
-            {/* No activeOptions. Measured in this story, in chromium: neither `exact: false` nor
-                `includeSearch: true` changes which row is current, because the router decides by the route it
-                matched, and a link carrying no search params is a subset of any address's params. Passing
-                either would be decoration. What matters — that a filter in the address is still the same
-                screen (D-06) — is asserted by the spec, on a story whose address carries a sort. */}
-            <RouterLink to={item.to} variant="nav">
+            {/* Kept as insurance, and honestly unproven. The router's active test (link.js in
+                @tanstack/react-router) compares the address's search params against the link's, partially,
+                and `includeSearch` defaults to true — which says the row would stop being current once the
+                transactions route gains `validateSearch` with defaults (plan 08) and someone sorts. A filter
+                is not another screen (D-06). But removing this option does NOT flip the row in the story,
+                even with a search schema on its route, because a link without an explicit `search` inherits
+                the current address's params. So the option costs nothing and may save the case the source
+                describes; the test that would prove it needs the real route, and belongs to plan 08. */}
+            <RouterLink to={item.to} activeOptions={{ includeSearch: false }} variant="nav">
               {item.label}
             </RouterLink>
           </li>

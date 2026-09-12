@@ -31,7 +31,15 @@ const root = createRootRoute({
 })
 const routeTree = root.addChildren([
   createRoute({ getParentRoute: () => root, path: '/' }),
-  createRoute({ getParentRoute: () => root, path: '/transactions' }),
+  // The transactions route carries a search schema with a default, as the app's will (D-06, plan 08). Without
+  // one the link's search is empty and the router's comparison never runs, so the story would assert nothing.
+  createRoute({
+    getParentRoute: () => root,
+    path: '/transactions',
+    validateSearch: (search: Record<string, unknown>) => ({
+      sort: typeof search['sort'] === 'string' ? search['sort'] : 'occurredAt:desc',
+    }),
+  }),
   createRoute({ getParentRoute: () => root, path: '/settings' }),
 ])
 
