@@ -1,8 +1,8 @@
 # Frontend foundation — an architectural skeleton
 
 An architectural skeleton for a crypto-tax frontend: the structure, the boundaries, the seams (API, state,
-routing, design system) and the tooling that keeps them true. Built as a take-home; the assignment it
-answers is quoted at the end.
+routing, design system) and the tooling that keeps them true. Built as a take-home; the brief it
+answers is summarised at the end.
 
 - **Architecture, one page:** [`ARCHITECTURE.md`](ARCHITECTURE.md)
 - **The long version** — every decision with its options, evidence and "wrong if":
@@ -74,13 +74,15 @@ agent may and may not do is written in [`CLAUDE.md`](CLAUDE.md).
 
 ---
 
-## The assignment
+## The brief
 
-> Build the architectural skeleton of a brand-new frontend for a crypto tax product: project structure,
-> dependency boundaries, an API layer over a mocked backend, representative routing, a design-system
-> foundation, quality tooling, one thin example page, and a one-page `ARCHITECTURE.md` explaining the
-> reasoning. TypeScript; `docker compose up` must be the only command needed. Roughly three to four hours,
-> cut deliberately and say what was cut.
->
-> Evaluated on: clarity of structure, whether boundaries are real or just folder names, sound choices at
-> the seams, pragmatism over over-engineering, and the quality of the reasoning in the write-up.
+A take-home exercise, summarised here in my own words. Build the architectural skeleton of a brand-new
+frontend for a crypto-tax product: project structure, dependency boundaries, an API layer over a mocked
+backend, representative routing, a design-system foundation, quality tooling, one thin example page, and
+a one-page `ARCHITECTURE.md` explaining the reasoning. TypeScript; `docker compose up` the only command
+needed to run it. Roughly three to four hours — cut deliberately, and say what was cut.
+
+Judged on five things: clarity of the structure, whether the boundaries are real or just folder names,
+sound choices at the seams, pragmatism over over-engineering, and the quality of the reasoning in the
+write-up. They are §7 of [the requirements](docs/requirements-and-analysis.md), and every decision in
+Part II is argued against them.
