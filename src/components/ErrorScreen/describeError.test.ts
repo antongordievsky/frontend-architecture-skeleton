@@ -14,7 +14,7 @@ describe('describeError', () => {
       'the network',
       new ApiError({ kind: 'network', cause: new TypeError('offline') }),
       'retry',
-      "We can't reach Tallyfolio",
+      "We can't reach the server",
     ],
     [
       'a broken contract',

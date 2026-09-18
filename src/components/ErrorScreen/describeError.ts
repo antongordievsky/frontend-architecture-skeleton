@@ -59,7 +59,7 @@ export const describeError = (error: unknown): ErrorDescription => {
       return describeStatus(problem.status)
     case 'network':
       return {
-        title: "We can't reach Tallyfolio",
+        title: "We can't reach the server",
         message: 'Check your connection, then try again.',
         action: 'retry',
       }
