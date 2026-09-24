@@ -37,3 +37,6 @@ playwright-report/
 .env
 .env.*
 !.env.example
+
+# Per-agent local settings (enabled MCP servers, etc.), never shared.
+.claude/settings.local.json
