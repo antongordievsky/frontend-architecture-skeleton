@@ -1,5 +1,7 @@
 #!/bin/sh
-# D-25: the backstop before anything leaves the machine: check where the reviewer runs it, in Docker.
+# D-25: the backstop before anything leaves the machine, without Docker — the devbox has none. The
+# Docker-dependent gates (check in the pinned image, the browser service, the production header test)
+# run in .github/workflows/ci.yml instead (DR-9, amended).
 set -eu
 
 # The checks read the working tree, so it must equal HEAD, the commit being pushed.
@@ -9,25 +11,17 @@ if ! git diff --quiet HEAD || [ -n "$(git ls-files --others --exclude-standard)"
   exit 1
 fi
 
-docker compose build check web browser
-docker compose run --rm check
-# D-14, D-09: the parts' component tests and screenshots, in three engines. Pre-commit does not run them:
-# check's image has no browsers.
-docker compose run --rm browser
+# The pinned runtimes live in mise.toml; git may start this hook without mise's shell hook on the PATH.
+run() {
+  if command -v mise >/dev/null 2>&1; then mise exec -- "$@"; else "$@"; fi
+}
 
-# D-21: the production form's headers and cache rules, asserted on the built bundle behind Caddy. The
-# hook uses its own compose project and port, so a web-prod the developer is running is left alone.
-project=tallyfolio-pre-push
-port=${PRE_PUSH_PORT:-18080}
-PROD_PORT=$port docker compose -p "$project" --profile prod up -d --build web-prod
-trap 'docker compose -p "$project" --profile prod down >/dev/null 2>&1' EXIT
-tries=0
-until curl -fsS -o /dev/null "http://localhost:$port/"; do
-  tries=$((tries + 1))
-  if [ "$tries" -ge 20 ]; then
-    echo 'pre-push: web-prod did not answer'
-    exit 1
-  fi
-  sleep 1
-done
-sh scripts/check-headers.sh "http://localhost:$port"
+# Nothing is staged at push time, so a directory-wide scan replaces pre-commit's staged one.
+run betterleaks dir --redact --no-banner .
+
+# Plan 05a noted and left open: a merge, rebase or cherry-pick never runs pre-commit, so nothing checks
+# what it brought into bun.lock. --all checks every locked version, whatever wrote it, closing that gap.
+# Node's fetch needs NODE_USE_ENV_PROXY=1 behind the agent's sandbox proxy; elsewhere it changes nothing.
+run env NODE_USE_ENV_PROXY=1 node scripts/check-lockfile-age.mjs --all
+
+run bun run check

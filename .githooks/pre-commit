@@ -24,10 +24,3 @@ if git diff --cached --name-only | grep -qx 'bun\.lock'; then
 fi
 
 run bun run check
-
-# Plan 01's lesson: a dependency change must also pass where the image installs from the lockfile.
-if git diff --cached --name-only | grep -qxE 'package\.json|bun\.lock|bunfig\.toml|Dockerfile|compose\.yaml'; then
-  echo 'pre-commit: dependencies or the image changed, running the Docker gate'
-  docker compose build check web
-  docker compose run --rm check
-fi
