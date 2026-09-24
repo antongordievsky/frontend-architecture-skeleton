@@ -8,26 +8,6 @@ exact = true
 # A version younger than 7 days is not installed. A reviewed security fix is named in
 # minimumReleaseAgeExcludes and removed once the version has aged.
 minimumReleaseAge = 604800
-# CC-05: orval 8.31.0 fixes ten advisories that 8.28.1 (the newest past the quarantine) carries. It was
-# reviewed on 2026-09-11 in plan 04: 21 verified commits between the tags, only version bumps, js-yaml
-# 4.3.2 and optional peers in the manifests, no install scripts, and no new process-spawning code in the
-# published files. 8.31.0 was published 2026-09-10: remove these names from 2026-09-17, once it has aged
-# (plan 04 said plan 05's batch; that came too early, as plan 05's log records).
-minimumReleaseAgeExcludes = [
-  "orval",
-  "@orval/angular",
-  "@orval/axios",
-  "@orval/core",
-  "@orval/effect",
-  "@orval/fetch",
-  "@orval/hono",
-  "@orval/mcp",
-  "@orval/mock",
-  "@orval/query",
-  "@orval/solid-start",
-  "@orval/swr",
-  "@orval/zod",
-]
 
 [install.cache]
 # A cached manifest lets a young version past the quarantine; fresh metadata closes that (CC-02).

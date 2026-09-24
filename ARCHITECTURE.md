@@ -108,9 +108,12 @@ format → lint → architecture rules → tokens → contract drift
       → route drift → typecheck → tests → build → secrets → audit
 ```
 
-It runs on a developer machine or in Docker, on every commit through a hook, and again before a
-push. Browser tests cover interaction and visual states in Chromium, WebKit and Firefox, with
-screenshot baselines compared at zero tolerance.
+It runs on a developer machine, on every commit through a hook, and again before a push; it can
+also be run in Docker (`docker compose run --rm check`) by hand. The pinned-image run of `check`,
+the browser tests (Chromium, WebKit and Firefox, with screenshot baselines compared at zero
+tolerance) and the production header test all need Docker, so they run in CI
+(`.github/workflows/ci.yml`) on every push instead of a local hook (DR-9, amended) — the devbox this
+project is developed in has none.
 
 Every new test and gate is deliberately broken once before it is adopted, to prove it detects the
 failure it claims to (QR-23).
@@ -125,7 +128,8 @@ This is a foundation, not a production frontend. Not built:
 - real authentication and sign-up flows
 - the support journey
 - a real backend, and any tax logic
-- CI/CD
+- CI/CD beyond mirroring the Docker-dependent gates in GitHub Actions (DR-9, amended) — no PR flow,
+  no agent reviewers as gates, no dependency-update bot
 - i18n
 - hosting
 - a full accessibility pass

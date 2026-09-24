@@ -41,12 +41,13 @@ Everything runs in Docker (C-2). Host commands use the runtimes pinned in `mise.
   WebKit and Firefox, with zero-tolerance screenshots in `__screenshots__/`. Whole pages and user flows
   run in Chromium and WebKit only (D-14's amendment, QR-22); the product ships one theme, so a state has
   one baseline, not one per theme (D-28's amendment). The baselines are Linux
-  images, so these run only in the `browser` service; before a commit that changes a part, a story or a
-  stylesheet, the agent runs it (D-09's note). The stand-in backend is `mock/handler.ts` (D-04); a
+  images, so these run only in the `browser` service, in `.github/workflows/ci.yml` (DR-9, amended): no
+  local hook runs it, and neither does the agent, since the devbox it works from has no Docker. A plan
+  that changes a part, a story or a stylesheet is not fully verified until that CI run is green — named
+  here, not silently assumed, since no local gate covers it before the commit. The stand-in backend is
+  `mock/handler.ts` (D-04); a
   test plugs it into `fetch` with `asFetch`. Only test files may import from outside `src/`, and only
   `mock/` (lint). The type-level amount test (`*.typetest.ts`) is checked by `typecheck`.
-- Any change to `package.json` — a script included — makes pre-commit run the Docker gate, which the
-  sandbox refuses (`~/.docker` is not writable), so such a commit runs outside it (found in plan 04).
 - Boundaries (D-16): the layer map is in `lint/layers.js`; the zones that exist are the rule's option in
   `.oxlintrc.json`. A new top-level folder in `src/` fails lint until its row is added. A new boundary
   gets a marked case in `lint/fixtures/layers` in the same commit. Only `ui/` imports React Aria, only
@@ -69,13 +70,15 @@ Everything runs in Docker (C-2). Host commands use the runtimes pinned in `mise.
   `sideEffects`, or call its effect from `main.tsx`.
 - Hooks (`.githooks/`, switched on once by `bun install` through `prepare`). Each refuses to run while
   the working tree differs from what it checks; set unrelated changes aside with
-  `git stash push --include-untracked -- <paths>`.
-  - pre-commit — the staged secrets scan and the full `check`, plus the Docker gate when dependencies
-    or the image change, and the lockfile's age gate when `bun.lock` changes: a version the commit adds
-    must be older than the quarantine (CC-08);
+  `git stash push --include-untracked -- <paths>`. Neither hook uses Docker (DR-9, amended): the
+  Docker-dependent gates — `check` in the pinned image, the `browser` service, the header test on the
+  production form — run in `.github/workflows/ci.yml` on push instead.
+  - pre-commit — the staged secrets scan, the lockfile's age gate when `bun.lock` changes (a version the
+    commit adds must be older than the quarantine, CC-08), and the full `check`;
   - commit-msg — the Conventional Commits header, at most 100 characters;
-  - pre-push — `check` in Docker, the `browser` service, and the header test on the production form, on
-    its own compose project and port (`PRE_PUSH_PORT`, default 18080).
+  - pre-push — a directory-wide secrets scan, the lockfile's age gate over every locked version
+    (`--all`, closing a gap plan 05a noted: a merge, rebase or cherry-pick never runs pre-commit), and
+    the full `check` again as a backstop.
 - Adding a package (D-23): verify it first (Security below), then `mise exec -- bun add <name>`. It
   asks the author, saves an exact version, and refuses versions younger than 7 days.
 - Updating (QR-25): one batch at the start of a plan — `bun outdated`, then `bun update <names>`,
@@ -216,9 +219,10 @@ Requirements (Part I) are written once and change only with the author's agreeme
 
   `docker` runs outside the sandbox, and the agent's `docker compose` commands are pre-approved. A
   container they start runs project code with write access to the tree and an open network. That gap
-  is named, not closed: D-26, deferred. A commit that changes dependencies runs the Docker gate, so it is
-  committed outside the sandbox, with the author's approval. So is a merge or branch switch that changes
-  `.claude/settings.json` or a compose file: the sandbox refuses git's write to those. Such a switch stops
-  half-done, with the tree between two commits, so finish it outside the sandbox — `git checkout -- <file>`
-  for what it could not rewrite, then the merge again (found in plan 06).
+  is named, not closed: D-26, deferred. A merge or branch switch that changes `.claude/settings.json` or
+  a compose file is committed outside the sandbox, with the author's approval: the sandbox refuses git's
+  write to those. Such a switch stops half-done, with the tree between two commits, so finish it outside
+  the sandbox — `git checkout -- <file>` for what it could not rewrite, then the merge again (found in
+  plan 06). Neither applies from a devbox: there `docker` does not exist at all, no hook or commit reaches
+  for it, and the Docker-dependent gates run in CI instead (DR-9, amended).
 - Everything else in the AI layer is decided in D-15 and exists only with a consumer (QR-18).

@@ -1,0 +1,57 @@
+# DR-9 (amended, plan 10): the devbox this repository is developed in has no Docker, so the
+# Docker-dependent gates that used to run in pre-push — check in the pinned image, the browser service's
+# component tests and screenshots, the production header test — run here instead, on every push.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: "1.4.2"
+      # A fast, Docker-free lockfile-integrity check before the slower, pinned-image run below.
+      - run: bun install --frozen-lockfile
+      - run: docker compose run --rm check
+
+  browser:
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: "1.4.2"
+      - run: bun install --frozen-lockfile
+      # D-14, D-09: the parts' component tests and screenshots, in three engines, against the Linux
+      # baselines committed in __screenshots__/ — only the browser service's image matches them.
+      - run: docker compose run --rm browser
+
+  web-prod:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: "1.4.2"
+      - run: bun install --frozen-lockfile
+      - run: docker compose --profile prod up -d --build web-prod
+      - name: wait for web-prod
+        run: |
+          for _ in $(seq 1 20); do
+            curl -fsS -o /dev/null http://localhost:8080/ && exit 0
+            sleep 1
+          done
+          echo "web-prod did not answer" >&2
+          exit 1
+      - run: sh scripts/check-headers.sh http://localhost:8080
+      - if: always()
+        run: docker compose --profile prod down
