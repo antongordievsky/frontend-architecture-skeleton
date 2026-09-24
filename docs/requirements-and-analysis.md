@@ -2566,6 +2566,10 @@ the correction is recorded here, dated, with what triggered it. This is the chai
     between the two tags. If any of it fails, the choice returns to the author.
   - The `js-yaml` override goes.
   - The exclusion is removed at plan 05's update batch, once the version has aged.
+  - *Closed 2026-09-24 (plan 10, the devbox contract chore):* the exclusion left `bunfig.toml`. `orval`
+    8.31.0 aged out of the quarantine on 2026-09-17; `--all` on the lockfile that day confirmed every
+    locked version, orval's included, older than the 7-day quarantine, so removal changed nothing it
+    would have caught.
 - **Lesson:** a pinned version is a measurement with a date. `bun audit` sees only the global database,
   and a project's own advisories reach it days later. A tool whose recent releases are security fixes is
   checked at its source as well.
