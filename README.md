@@ -47,6 +47,18 @@ Runtimes are pinned in `mise.toml` (`mise install`), and every command goes thro
 | Regenerate the route tree | `mise exec -- bun run routes` |
 | Production headers and cache rules (with `web-prod` up) | `sh scripts/check-headers.sh` |
 
+## The package manager, as a security choice
+
+Bun is the only package manager: one lockfile (`bun.lock`), `packageManager` and `engines.bun` pinned
+exactly, and `trustedDependencies: ["!none"]` so no dependency runs an install script unless it is named.
+`bunfig.toml` adds a 7-day quarantine (`minimumReleaseAge`): a version cannot enter the lockfile until it
+has had a week to be caught and pulled if it turns out to be a hijacked release (D-23, QR-24). A named,
+reviewed exception can skip the wait; the last one, for a security fix in `orval`, was removed once the
+version aged past the quarantine on its own (CC-05). An AI agent that can name a fresh dependency is one
+more reason that window matters. When an agent works on this repository, it does so from a devbox: an
+isolated container with no route out but the npm registry, GitHub and the Anthropic API, so a compromised
+install script — however it got in — has nowhere to send what it steals.
+
 ## Adding things
 
 Each recipe is short by design — the structure is meant to be extended live, in an interview:
