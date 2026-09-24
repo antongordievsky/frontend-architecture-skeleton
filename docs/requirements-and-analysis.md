@@ -2217,6 +2217,10 @@ themselves drive. It is decided now because plan 06 builds the first parts, and 
     with its reason;
   - a CI on another CPU architecture renders differently from this machine's image. Then the baselines come from the
     CI's image (D-11);
+    - *This happened, 2026-09-24 (CC-11):* the `browser` job ran `ubuntu-latest`, an x64 image, against
+      baselines shot on this arm64 machine. `TextField`'s default-focused story diverged by a few pixels
+      under zero tolerance. Rather than move the baselines to the CI's image, the job now runs on
+      `ubuntu-24.04-arm` (`cdcc99e`), matching the architecture the baselines were made on;
   - designers or product people need to review states without running the project. Then Storybook and a hosted
     review, with the stories moved into its format;
   - Playwright changes the gallery contract in a minor release. Then pin the version and follow its migration.
@@ -2679,6 +2683,19 @@ the correction is recorded here, dated, with what triggered it. This is the chai
 - *Changed:* the root route wraps the routes in `RouterLinkNavigation`. A component spec presses Enter, and checks
   both that the current page moves and that the address stays inside the app. Links and controls are tested by
   the keyboard, as well as by the pointer.
+
+### CC-11 — The CI runner's architecture was assumed to match the baselines' · 2026-09-24
+
+- **Assumed:** D-14's "Wrong if" named the risk in the abstract — a CI on another CPU architecture renders
+  differently from the baselines' machine — but the `browser` job ran `ubuntu-latest`, an x64 GitHub-hosted
+  image, unexamined against the arm64 machine the baselines were shot on.
+- **Found:** the job's zero-tolerance screenshot comparison failed: `TextField`'s default-focused story
+  differed from its baseline by a few pixels, present only on the x64 runner.
+- **Changed:** the `browser` job now runs on `ubuntu-24.04-arm` (`cdcc99e`), matching the baselines'
+  architecture, instead of moving the baselines to the CI's image as D-14's "Wrong if" had proposed —
+  cheaper than regenerating and reviewing every baseline.
+- **Lesson:** zero tolerance means the runner's architecture is a fact to measure against the baselines',
+  not one to assume matches, and D-14's own "Wrong if" had already named the exact failure mode.
 
 ---
 
