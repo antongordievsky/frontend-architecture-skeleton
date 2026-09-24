@@ -1,7 +1,7 @@
 # Plan 10 — Bring the repository to the devbox contract
 
-**Status:** in progress — GREEN LIGHT 2026-09-24 (the author's request, with the specifics below given
-up front) · **Timebox:** 45 min of execution
+**Status:** done 2026-09-24 — GREEN LIGHT 2026-09-24 (the author's request, with the specifics below
+given up front) · **Timebox:** 45 min of execution
 **Serves:** an org-level operational policy, not Part I. **Touches:** D-23 (quarantine exclusion),
 D-25 (hooks), DR-9 (CI/CD, amended)
 
@@ -96,4 +96,63 @@ specifics up front:
 
 ## What happened
 
-(filled in at wrap-up)
+Executed 2026-09-24 on `chore/devbox-contract`, within the timebox. Six commits, in this order:
+
+- `90faa80` — the `.gitignore` fix, found and fixed before anything else because without it `bun run
+  check` failed on `.claude/settings.local.json` in this session, regardless of the plan.
+- `10e716e` — this plan.
+- `0e94aac` — the hooks, without Docker; `CLAUDE.md`, `ARCHITECTURE.md` and the DR-9 amendment.
+- `74c144b` — the `bunfig.toml` exclusion removal (CC-05, closed).
+- `9aac6ac` — the README paragraph.
+- `6297bc0` — `.github/workflows/ci.yml`.
+
+**Deviations from the plan**
+
+- *Step order.* The plan listed the `bunfig.toml` exclusion (step 2) before the hooks fix (step 4).
+  Executing in that order failed: with the Docker gate still in `pre-commit`, staging `bunfig.toml`
+  triggered it, and `docker: not found` blocked the commit outright — the exact failure this whole plan
+  exists to close. Reordered on the spot: hooks first (with `CLAUDE.md`/`ARCHITECTURE.md`/DR-9 bundled
+  into that commit, since they describe the same behaviour change), then the exclusion. Recorded here
+  rather than rewriting the steps above, per the project's own rule that a plan's steps are a record, not
+  erased when the order changes.
+- *A commit briefly held two unrelated changes.* The first `git commit` accidentally included both the
+  `.gitignore` fix and the plan document (the plan file was staged from an earlier failed commit attempt
+  and never unstaged). Caught immediately from `git show --stat`; undone with `git reset HEAD~1`
+  (soft — nothing had been pushed or reviewed) and re-committed as two.
+
+**Verification**
+
+- `bun install`: 359 packages, clean.
+- `bun run lint`: `oxlint --deny-warnings` clean; `layers.test.mjs` — all 33 expected boundary violations
+  reported, nothing else.
+- `bun run test`: 77 tests, 8 files, green.
+- `bun run typecheck`: clean.
+- `bun run check` (the full gate: format → lint → tokens → contract drift → route drift → typecheck →
+  tests → build → secrets → audit): green after every commit above, via `pre-commit` — no Docker, the
+  whole way.
+- `NODE_USE_ENV_PROXY=1 node scripts/check-lockfile-age.mjs --all`: exit 0 both before and after removing
+  the CC-05 exclusion — "455 added version(s), all older than the quarantine" — confirming the removal
+  changes nothing the gate would have caught.
+- The rewritten `pre-push` was exercised by hand (`sh .githooks/pre-push`) against the clean, committed
+  tree after the hooks commit: directory-wide secrets scan (no leaks), `--all` lockfile check (pass), full
+  `check` (green) — no Docker, no failure.
+- The dev server: `MOCK_URL=http://localhost:3001 bun run dev -- --host 0.0.0.0 --port $DEVBOX_PORT
+  --strictPort` (`$DEVBOX_PORT` = 5174 in this session) against the mock backend on 3001 — `curl` got
+  `200` from `http://localhost:$DEVBOX_PORT/`, checked once before any change and once after all of them.
+- The CI workflow's YAML was parsed with `js-yaml` (present transitively) rather than a real dispatch:
+  this session can reach GitHub but not trigger a run before the author pushes. The three `run` steps are
+  the same `docker compose` commands `pre-push` used to run by hand, unchanged in substance — only their
+  venue moved.
+- `/code-review` and `/security-review`: skipped, and recorded here as the log asks. This plan touches no
+  session, permission, cookie, header, CSP or proxy code, and adds no dependency — only build tooling
+  (hooks, CI config) and documentation.
+
+**Left for the author** (per the devbox contract; GitHub settings are the author's):
+
+- Branch protection on `main`.
+- Dependabot alerts.
+- Secret scanning (GitHub's own, distinct from the `betterleaks` gate already in the hooks and `check`).
+- The GitHub token / permissions covering this repository, if the CI workflow needs anything the default
+  `GITHUB_TOKEN` with `contents: read` doesn't already cover (it doesn't need more for these three jobs).
+- Watching the first real CI run once this branch is pushed — this session verified the workflow's shape
+  and syntax, not a live GitHub Actions execution.
